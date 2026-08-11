@@ -6,7 +6,8 @@ data class Branch(
     val key: String,
     val name: String,
     val username: String,
-    val password: String
+    val password: String,
+    val syncKey: String = FirebaseClient.SYNC_KEY
 ) {
     companion object {
         fun from(key: String, o: JSONObject): Branch? {
@@ -15,7 +16,8 @@ data class Branch(
                     key = key,
                     name = o.optString("name"),
                     username = o.optString("username"),
-                    password = o.optString("password")
+                    password = o.optString("password"),
+                    syncKey = o.optString("sync_key", FirebaseClient.SYNC_KEY)
                 )
             } catch (e: Exception) { null }
         }
