@@ -331,7 +331,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             currentPayments.value = list.toMutableList()
             store.savePayments(currentPayments.value)
         } else if (idx in periods.value.indices) {
-            periods.value[idx].payments = list.toMutableList()
+            periods.value[idx].payments.clear()
+            periods.value[idx].payments.addAll(list)
             store.savePeriods(periods.value)
         }
     }
