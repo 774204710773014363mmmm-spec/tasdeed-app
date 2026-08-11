@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "tasdeed-native"
-include ':app'
+include(":app")
