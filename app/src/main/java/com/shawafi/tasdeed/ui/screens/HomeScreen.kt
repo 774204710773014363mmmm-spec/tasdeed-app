@@ -52,11 +52,13 @@ fun HomeScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        val filtered = subscribers.filter {
-            query.isBlank() ||
-            it.name.contains(query, ignoreCase = true) ||
-            it.meterNumber.contains(query, true) ||
-            it.subscriberNumber.contains(query, true)
+        val filtered = remember(query, subscribers) {
+            subscribers.filter {
+                query.isBlank() ||
+                it.name.contains(query, ignoreCase = true) ||
+                it.meterNumber.contains(query, true) ||
+                it.subscriberNumber.contains(query, true)
+            }
         }
 
         if (query.isBlank()) {
@@ -69,7 +71,7 @@ fun HomeScreen(
             }
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(filtered) { sub ->
+                items(filtered, key = { it.key }) { sub ->
                     SubscriberCard(sub, isLocked = (locks[sub.key] ?: 0) > System.currentTimeMillis()) {
                         selected = sub
                     }
@@ -117,11 +119,12 @@ fun SubscriberCard(sub: Subscriber, isLocked: Boolean, onClick: () -> Unit) {
     }
 }
 
+private val sharedNumFmt = java.text.NumberFormat.getNumberInstance(java.util.Locale.US)
+
 fun formatNum(v: Double): String {
-    val s = java.lang.String.format("%.0f", v)
     return try {
-        java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(v).replace(",", ",")
-    } catch (e: Exception) { s }
+        sharedNumFmt.format(v)
+    } catch (e: Exception) { java.lang.String.format("%.0f", v) }
 }
 
 @Composable
