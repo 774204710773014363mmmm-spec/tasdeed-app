@@ -1,7 +1,10 @@
 package com.shawafi.tasdeed.ui.screens
 
 import android.content.Context
-import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -23,7 +27,9 @@ import com.shawafi.tasdeed.data.PaymentRecord
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
 import com.shawafi.tasdeed.ui.theme.Amber
-import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,25 +137,109 @@ fun PeriodDetailDialog(vm: AppViewModel, name: String, idx: Int, onDismiss: () -
     val currentPayments by vm.currentPayments.collectAsState()
     val periods by vm.periods.collectAsState()
     val list = if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList()
-    val total = list.sumOf { it.amount }
+    val grouped = remember(list) { ReportExporter.groupPayments(list).sortedByDescending { it.latestDate } }
+    val total = grouped.sumOf { it.total }
+    val scope = rememberCoroutineScope()
+    val ctx = LocalContext.current
+
+    var exporting by remember { mutableStateOf(false) }
     var editMode by remember { mutableStateOf(false) }
     var editedAmounts by remember { mutableStateOf<MutableMap<String, Double>>(mutableMapOf()) }
 
+    val savePdf = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            exporting = true
+            val ok = withContext(Dispatchers.IO) {
+                try {
+                    val os = ctx.contentResolver.openOutputStream(uri)
+                    if (os == null) false
+                    else {
+                        ReportExporter.exportPdf(os, vm, name, list)
+                        os.close()
+                        true
+                    }
+                } catch (e: Exception) { false }
+            }
+            exporting = false
+            if (ok) vm.toast("✅ تم حفظ ملف PDF")
+            else vm.toast("❌ فشل حفظ الملف", true)
+        }
+    }
+
+    val saveExcel = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/vnd.ms-excel")
+    ) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            exporting = true
+            val ok = withContext(Dispatchers.IO) {
+                try {
+                    val os = ctx.contentResolver.openOutputStream(uri)
+                    if (os == null) false
+                    else {
+                        ReportExporter.exportExcel(os, vm, name, list)
+                        os.close()
+                        true
+                    }
+                } catch (e: Exception) { false }
+            }
+            exporting = false
+            if (ok) vm.toast("✅ تم حفظ ملف Excel")
+            else vm.toast("❌ فشل حفظ الملف", true)
+        }
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp)) {
-            Column(Modifier.padding(20.dp).heightIn(max = 600.dp)) {
+            Column(Modifier.padding(20.dp).heightIn(max = 640.dp)) {
                 Text(if (isCurrent) "📋 $name" else "📁 $name", fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                Text("${list.size} دفعة | ${formatNum(total)} د.ع", fontSize = 13.sp, color = Color.Gray)
+                Text("${grouped.size} مشترك | ${formatNum(total)} د.ع", fontSize = 13.sp, color = Color.Gray)
                 Spacer(Modifier.height(8.dp))
-                if (list.isEmpty()) {
-                    Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
-                        Text("لا توجد دفعات", color = Color.Gray)
+
+                if (!editMode) {
+                    if (grouped.isEmpty()) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
+                            Text("لا توجد مدفوعات في هذا الكشف", color = Color.Gray)
+                        }
+                    } else {
+                        // جدول كامل بكل الأسماء
+                        LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            item {
+                                Row(Modifier.fillMaxWidth().background(Green).padding(vertical = 8.dp, horizontal = 6.dp)) {
+                                    Text("#", Modifier.width(26.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text("المشترك", Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text("العداد", Modifier.width(70.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
+                                    Text("آخر تاريخ", Modifier.width(78.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center)
+                                    Text("الإجمالي", Modifier.width(72.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.End)
+                                }
+                            }
+                            items(grouped.size) { i ->
+                                val s = grouped[i]
+                                Row(Modifier.fillMaxWidth().background(if (i % 2 == 0) Color(0xFFF9F9F9) else Color.White).padding(vertical = 7.dp, horizontal = 6.dp)) {
+                                    Text("${i + 1}", Modifier.width(26.dp), fontSize = 12.sp, color = Color.Gray)
+                                    Text(s.name.ifEmpty { "-" }, Modifier.weight(1f), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(s.meter.ifEmpty { "-" }, Modifier.width(70.dp), fontSize = 12.sp, textAlign = TextAlign.Center)
+                                    Text(s.latestDate, Modifier.width(78.dp), fontSize = 11.sp, color = Color.Gray, textAlign = TextAlign.Center)
+                                    Text(formatNum(s.total), Modifier.width(72.dp), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Green, textAlign = TextAlign.End)
+                                }
+                                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
+                            }
+                        }
                     }
                 } else {
-                    LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        items(list.sortedByDescending { it.createdAt }) { p ->
-                            Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (editMode) {
+                    // وضع التعديل: دفعات فردية
+                    val raw = if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList()
+                    if (raw.isEmpty()) {
+                        Box(Modifier.fillMaxWidth().padding(vertical = 20.dp), contentAlignment = Alignment.Center) {
+                            Text("لا توجد دفعات", color = Color.Gray)
+                        }
+                    } else {
+                        LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            items(raw) { p ->
+                                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     OutlinedTextField(
                                         value = editedAmounts[p.localId]?.let { formatNum(it) } ?: formatNum(p.amount),
                                         onValueChange = { editedAmounts[p.localId] = it.toDoubleOrNull() ?: 0.0 },
@@ -158,24 +248,16 @@ fun PeriodDetailDialog(vm: AppViewModel, name: String, idx: Int, onDismiss: () -
                                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, textAlign = TextAlign.Center)
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text("د.ع", fontSize = 11.sp, color = Color.Gray)
-                                } else {
                                     Text(p.subscriberName, modifier = Modifier.weight(1f), fontSize = 13.sp)
                                 }
-                                if (!editMode) {
-                                    Text("📅 ${p.paymentDate}", fontSize = 11.sp, color = Color.Gray)
-                                    Spacer(Modifier.width(10.dp))
-                                    Text("${formatNum(p.amount)} د.ع", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Green)
-                                }
+                                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
                             }
-                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
                         }
-                    }
-                    if (editMode) {
                         Spacer(Modifier.height(6.dp))
                         Text("💾 الإجمالي: ${formatNum(editedAmounts.values.sum())} د.ع", fontSize = 12.sp, color = Green)
                     }
                 }
+
                 Spacer(Modifier.height(12.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(44.dp)) { Text("إغلاق") }
@@ -198,24 +280,16 @@ fun PeriodDetailDialog(vm: AppViewModel, name: String, idx: Int, onDismiss: () -
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
-                        onClick = {
-                            val ctx = vm.getApplication<android.app.Application>()
-                            val f = ReportExporter.exportPdf(ctx, vm, name, list)
-                            if (f != null) ReportExporter.share(ctx, f)
-                            else vm.toast("لا يوجد مدفوعات", true)
-                        },
+                        onClick = { savePdf.launch("كشف_${name.replace(" ", "_").replace("/", "_")}.pdf") },
                         modifier = Modifier.weight(1f).height(44.dp),
+                        enabled = !exporting,
                         colors = ButtonDefaults.buttonColors(containerColor = Green)
                     ) { Text("📄 PDF") }
                     Button(
-                        onClick = {
-                            val ctx = vm.getApplication<android.app.Application>()
-                            val f = ReportExporter.exportExcel(ctx, vm, name, list)
-                            if (f != null) ReportExporter.share(ctx, f)
-                            else vm.toast("لا يوجد مدفوعات", true)
-                        },
+                        onClick = { saveExcel.launch("كشف_${name.replace(" ", "_").replace("/", "_")}.xls") },
                         modifier = Modifier.weight(1f).height(44.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFF16A34A))
+                        enabled = !exporting,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF16A34A))
                     ) { Text("📊 Excel") }
                     if (!isCurrent) {
                         OutlinedButton(
@@ -224,8 +298,17 @@ fun PeriodDetailDialog(vm: AppViewModel, name: String, idx: Int, onDismiss: () -
                                 onDismiss()
                             },
                             modifier = Modifier.weight(1f).height(44.dp),
+                            enabled = !exporting,
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFDC2626))
                         ) { Text("🗑 حذف") }
+                    }
+                }
+                if (exporting) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("🔄 جاري إنشاء الملف...", fontSize = 12.sp, color = Color.Gray)
                     }
                 }
             }
