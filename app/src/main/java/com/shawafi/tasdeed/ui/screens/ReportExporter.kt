@@ -2,9 +2,7 @@ package com.shawafi.tasdeed.ui.screens
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import androidx.core.content.FileProvider
@@ -28,15 +26,14 @@ object ReportExporter {
         val total = sorted.sumOf { it.amount }
 
         val doc = PdfDocument()
-        val pageW = 842
-        val rowH = 34
-        val headerH = 120
-        val titleH = 60
-        val bodyTop = headerH + titleH + 20
-        val rowsPerPage = ((1123 - bodyTop - 120) / rowH).toInt().coerceAtLeast(5)
+        val pageW = 842f
+        val rowH = 34f
+        val headerH = 120f
+        val titleH = 60f
+        val bodyTop = headerH + titleH + 20f
+        val rowsPerPage: Int = (((1123 - bodyTop - 120) / rowH).toInt()).coerceAtLeast(5)
         var pageCount = 0
         val pageCountTotal = (sorted.size / rowsPerPage) + 1
-
         val titlePaint = Paint().apply { color = 0xFF059669.toInt(); textSize = 34f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
         val subPaint = Paint().apply { color = 0xFF333333.toInt(); textSize = 20f; textAlign = Paint.Align.CENTER }
         val smallPaint = Paint().apply { color = 0xFF666666.toInt(); textSize = 15f; textAlign = Paint.Align.CENTER }
@@ -49,22 +46,21 @@ object ReportExporter {
         val colW = floatArrayOf(60f, 260f, 170f, 180f, 172f)
         val cols = 5
         var offset = 0
-
         while (offset < sorted.size) {
-            val page = doc.startPage(PdfDocument.PageInfo.Builder(pageW, 1123, pageCount + 1).create())
+            val page = doc.startPage(PdfDocument.PageInfo.Builder(842, 1123, pageCount + 1).create())
             val canvas = page.canvas
             val chunk = sorted.subList(offset, minOf(offset + rowsPerPage, sorted.size))
 
             // header
-            canvas.drawRect(0f, 0f, pageW.toFloat(), 4f, Paint().apply { color = 0xFF059669.toInt() })
+            canvas.drawRect(0f, 0f, pageW, 4f, Paint().apply { color = 0xFF059669.toInt() })
             canvas.drawText("💰 تقرير المدفوعات - $user", pageW / 2f, 60f, titlePaint)
             canvas.drawText(brName, pageW / 2f, 95f, subPaint)
             canvas.drawText("التاريخ: $today | عدد الدفعات: ${sorted.size}", pageW / 2f, 120f, smallPaint)
-            canvas.drawRect(0f, 130f, pageW.toFloat(), 133f, Paint().apply { color = 0xFF059669.toInt() })
+            canvas.drawRect(0f, 130f, pageW, 133f, Paint().apply { color = 0xFF059669.toInt() })
 
             // total box
             canvas.drawText("الإجمالي: ${numFmt.format(total)} د.ع", pageW / 2f, bodyTop - 10, totalPaint)
-            canvas.drawText("(", 0f, 0f, totalPaint)
+            
 
             var y = bodyTop
             // table header
