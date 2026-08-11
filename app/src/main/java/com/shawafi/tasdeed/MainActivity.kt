@@ -1,0 +1,76 @@
+package com.shawafi.tasdeed
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.shawafi.tasdeed.ui.AppViewModel
+import com.shawafi.tasdeed.ui.screens.ArchiveScreen
+import com.shawafi.tasdeed.ui.screens.FreeScreen
+import com.shawafi.tasdeed.ui.screens.HomeScreen
+import com.shawafi.tasdeed.ui.screens.LoginScreen
+import com.shawafi.tasdeed.ui.screens.SettingsScreen
+import com.shawafi.tasdeed.ui.theme.TasdeedTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.Composable
+import kotlinx.coroutines.delay
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            TasdeedTheme {
+                MainApp()
+            }
+        }
+    }
+}
+
+@Composable
+fun MainApp(vm: AppViewModel = viewModel()) {
+    val loggedIn by vm.isLoggedIn.collectAsState()
+    val snackbar = remember { SnackbarHostState() }
+    val msg by vm.message.collectAsState()
+
+    LaunchedEffect(msg) {
+        msg?.let {
+            val res = snackbar.showSnackbar(it.text, duration = androidx.compose.material3.SnackbarDuration.Short)
+            if (res == SnackbarResult.Dismissed) vm.clearToast()
+            delay(200)
+            vm.clearToast()
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbar) }
+    ) { padding ->
+        if (loggedIn) {
+            MainNav(vm, padding)
+        } else {
+            LoginScreen(vm, Modifier.fillMaxSize(), padding)
+        }
+    }
+}
+
+@Composable
+fun MainNav(vm: AppViewModel, padding: androidx.compose.foundation.layout.PaddingValues) {
+    var screen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("home") }
+
+    when (screen) {
+        "home" -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = { screen = it })
+        "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = { screen = it })
+        "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = { screen = it })
+        "settings" -> SettingsScreen(vm, Modifier.fillMaxSize(), padding, onNav = { screen = it })
+        else -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = { screen = it })
+    }
+}
