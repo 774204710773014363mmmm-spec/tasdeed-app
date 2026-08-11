@@ -20,6 +20,7 @@ import com.shawafi.tasdeed.ui.screens.FreeScreen
 import com.shawafi.tasdeed.ui.screens.HomeScreen
 import com.shawafi.tasdeed.ui.screens.LoginScreen
 import com.shawafi.tasdeed.ui.screens.SettingsScreen
+import com.shawafi.tasdeed.ui.screens.StatementScreen
 import com.shawafi.tasdeed.ui.theme.TasdeedTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
@@ -46,6 +47,7 @@ fun MainApp(vm: AppViewModel = viewModel()) {
     val snackbar = remember { SnackbarHostState() }
     val msg by vm.message.collectAsState()
     var screen by remember { mutableStateOf("home") }
+    var statement by remember { mutableStateOf<Pair<String, Int>?>(null) }
 
     LaunchedEffect(msg) {
         msg?.let {
@@ -60,13 +62,18 @@ fun MainApp(vm: AppViewModel = viewModel()) {
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            if (loggedIn) {
+            if (loggedIn && statement == null) {
                 BottomNavBar(vm, screen) { screen = it }
             }
         }
     ) { padding ->
         if (loggedIn) {
-            MainNav(vm, screen, padding) { screen = it }
+            val stmt = statement
+            if (stmt != null) {
+                StatementScreen(vm, stmt.first, stmt.second, onBack = { statement = null })
+            } else {
+                MainNav(vm, screen, padding, onNav = { screen = it }, onOpenStatement = { name, idx -> statement = name to idx })
+            }
         } else {
             LoginScreen(vm, Modifier.fillMaxSize(), padding)
         }
@@ -74,11 +81,17 @@ fun MainApp(vm: AppViewModel = viewModel()) {
 }
 
 @Composable
-fun MainNav(vm: AppViewModel, screen: String, padding: androidx.compose.foundation.layout.PaddingValues, onNav: (String) -> Unit) {
+fun MainNav(
+    vm: AppViewModel,
+    screen: String,
+    padding: androidx.compose.foundation.layout.PaddingValues,
+    onNav: (String) -> Unit,
+    onOpenStatement: (String, Int) -> Unit = { _, _ -> }
+) {
     when (screen) {
         "home" -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
         "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
-        "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
+        "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement)
         "settings" -> SettingsScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
         else -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
     }
