@@ -44,7 +44,7 @@ fun FreeScreen(
                 Text("💸 الدفعات الحرة", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Spacer(Modifier.height(4.dp))
             }
-            items(freePayments) { fp ->
+            items(freePayments, key = { it.localId }) { fp ->
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
@@ -70,7 +70,7 @@ fun FreeScreen(
                     Spacer(Modifier.height(4.dp))
                 }
             }
-            items(pendingFree) { fp ->
+            items(pendingFree, key = { it.localId }) { fp ->
                 Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
