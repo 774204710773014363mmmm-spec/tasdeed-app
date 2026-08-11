@@ -16,6 +16,7 @@ import com.shawafi.tasdeed.ui.theme.Amber
 
 data class NavItem(val id: String, val label: String, val icon: ImageVector)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
     val pendingCount = vm.pendingPayments.value.size + vm.pendingFreePayments.value.size
@@ -45,6 +46,7 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopBar(vm: AppViewModel, title: String, onRefresh: (() -> Unit)? = null) {
     TopAppBar(
