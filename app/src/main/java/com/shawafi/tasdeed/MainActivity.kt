@@ -22,6 +22,10 @@ import com.shawafi.tasdeed.ui.screens.SettingsScreen
 import com.shawafi.tasdeed.ui.theme.TasdeedTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -64,7 +68,7 @@ fun MainApp(vm: AppViewModel = viewModel()) {
 
 @Composable
 fun MainNav(vm: AppViewModel, padding: androidx.compose.foundation.layout.PaddingValues) {
-    var screen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("home") }
+    var screen by remember { mutableStateOf("home") }
 
     when (screen) {
         "home" -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = { screen = it })
