@@ -5,7 +5,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-class AppRepository(private val store: LocalStore) {
+class AppRepository(val store: LocalStore) {
 
     private var branchesCache: MutableMap<String, Branch> = mutableMapOf()
     private var subscribersCache: MutableMap<String, Subscriber> = mutableMapOf()
