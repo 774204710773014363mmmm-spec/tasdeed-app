@@ -6,4 +6,6 @@ local.properties
 .DS_Store
 Thumbs.db
 *.apk
-!keepme
+gh_token.txt
+_apk_tmp.zip
+build_apk.py
