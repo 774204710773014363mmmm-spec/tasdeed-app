@@ -2,9 +2,12 @@ package com.shawafi.tasdeed.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -14,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -37,11 +42,23 @@ fun SettingsScreen(
     val fontScale by vm.fontScale.collectAsState()
     val bioEnabled by vm.bioEnabled.collectAsState()
     var pendingVisible by remember { mutableStateOf(false) }
+    var smsPassOpen by remember { mutableStateOf(false) }
+    var smsPass by remember { mutableStateOf("") }
+    var smsPassHidden by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
     Column(modifier = modifier.padding(padding)) {
         TopBar(vm, "الإعدادات")
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item {
+                Card(Modifier.fillMaxWidth().clickable { smsPass = ""; smsPassOpen = true }) {
+                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("📨 فواتير SMS", fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.weight(1f))
+                        Text("▶", color = Color.Gray, fontSize = 12.sp)
+                    }
+                }
+            }
             item {
                 Card(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(16.dp)) {
@@ -197,6 +214,54 @@ fun SettingsScreen(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // نافذة كلمة مرور ميزة SMS (خاطئة ← تُغلق بصمت بدون أي رسالة)
+    if (smsPassOpen) {
+        Dialog(onDismissRequest = { smsPassOpen = false; smsPass = "" }) {
+            Surface(shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("🔒 أدخل كلمة المرور", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Spacer(Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = smsPass,
+                        onValueChange = { smsPass = it },
+                        label = { Text("كلمة المرور") },
+                        singleLine = true,
+                        visualTransformation = if (smsPassHidden) PasswordVisualTransformation() else VisualTransformation.None,
+                        trailingIcon = {
+                            IconButton(onClick = { smsPassHidden = !smsPassHidden }) {
+                                Icon(
+                                    if (smsPassHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                    contentDescription = "إظهار"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = { smsPassOpen = false; smsPass = "" },
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) { Text("إلغاء") }
+                        Button(
+                            onClick = {
+                                smsPassOpen = false
+                                if (smsPass.trim() == "773520853") {
+                                    smsPass = ""
+                                    onNav("sms")
+                                } else {
+                                    smsPass = ""
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Green)
+                        ) { Text("دخول") }
                     }
                 }
             }
