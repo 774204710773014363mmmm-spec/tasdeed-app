@@ -96,7 +96,7 @@ object SmsImport {
             when {
                 c == '"' && inQuotes && i + 1 < line.length && line[i + 1] == '"' -> { cur.append('"'); i += 2 }
                 c == '"' -> { inQuotes = !inQuotes; i++ }
-                c == ',' && !inQuotes -> { out.add(cur.toString()); cur = StringBuilder(); i++ }
+                c == ',' && !inQuotes -> { out.add(cur.toString()); cur.setLength(0); i++ }
                 else -> { cur.append(c); i++ }
             }
         }
