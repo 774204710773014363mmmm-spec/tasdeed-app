@@ -60,6 +60,7 @@ data class PaymentRecord(
     val subscriberId: String = "",
     val subscriberName: String = "",
     val meterNumber: String = "",
+    val subscriberNumber: String = "",
     val amount: Double = 0.0,
     val unpaidBalance: Double = 0.0,
     val note: String = "",
@@ -77,6 +78,7 @@ data class PaymentRecord(
         put("subscriber_id", subscriberId)
         put("subscriber_name", subscriberName)
         put("meter_number", meterNumber)
+        put("subscriber_number", subscriberNumber)
         put("amount", amount)
         put("unpaid_balance", unpaidBalance)
         put("note", note)
@@ -96,6 +98,7 @@ data class PaymentRecord(
             subscriberId = o.optString("subscriber_id"),
             subscriberName = o.optString("subscriber_name"),
             meterNumber = o.optString("meter_number"),
+            subscriberNumber = o.optString("subscriber_number"),
             amount = o.optDouble("amount", 0.0),
             unpaidBalance = o.optDouble("unpaid_balance", 0.0),
             note = o.optString("note"),
