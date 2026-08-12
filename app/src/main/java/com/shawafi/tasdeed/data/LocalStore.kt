@@ -23,6 +23,12 @@ class LocalStore(context: Context) {
         sp.edit().putBoolean(key, value).apply()
     }
 
+    fun getInt(key: String, def: Int = 0): Int = sp.getInt(key, def)
+
+    fun putInt(key: String, value: Int) {
+        sp.edit().putInt(key, value).apply()
+    }
+
     fun getJsonArray(key: String): JSONArray? {
         val s = getString(key) ?: return null
         return try { JSONArray(s) } catch (e: Exception) { null }
