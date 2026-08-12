@@ -18,7 +18,8 @@ data class ImportResult(val rows: List<SmsRow>, val invalidPhones: List<String>,
  */
 object SmsImport {
 
-    private val PHONE_HEADERS = listOf("رقم المشترك", "الجوال", "رقم الجوال", "الهاتف", "الموبايل", "موبايل", "phone", "mobile")
+    private val MOBILE_HEADERS = listOf("رقم الجوال", "الجوال", "رقم الموبايل", "الموبايل", "الهاتف", "موبايل", "جوال", "phone", "mobile", "tel", "mobile number")
+    private val SUB_HEADERS = listOf("رقم المشترك", "رقم الاشتراك", "رقم الحساب", "رقم العميل", "المشترك", "subscriber", "sub no")
     private val NAME_HEADERS = listOf("اسم المشترك", "الاسم", "اسم", "name")
     private val PREV_HEADERS = listOf("القراءة السابقة", "قراءة سابقة", "السابقة", "previous", "prev")
     private val CUR_HEADERS = listOf("القراءة الحالية", "قراءة حالية", "الحالية", "current", "cur")
@@ -26,14 +27,17 @@ object SmsImport {
 
     fun parse(context: Context, uri: Uri): ImportResult {
         return try {
-            val name = uri.lastPathSegment ?: ""
-            val ext = name.substringAfterLast('.', "").lowercase()
             val input = context.contentResolver.openInputStream(uri) ?: return ImportResult(emptyList(), emptyList(), "تعذر فتح الملف")
             input.use { stream ->
-                val parsed: List<List<String>> = when (ext) {
-                    "xls" -> readXls(stream)
-                    "xlsx" -> readXlsx(stream)
-                    else -> readCsv(stream)
+                val bytes = stream.readBytes()
+                val parsed: List<List<String>> = when {
+                    // كشف النوع من محتوى الملف نفسه وليس من اسمه
+                    bytes.size >= 4 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte() && bytes[2] == 3 && bytes[3] == 4 ->
+                        readXlsx(bytes)
+                    bytes.size >= 8 && bytes[0] == 0xD0.toByte() && bytes[1] == 0xCF.toByte() && bytes[2] == 0x11.toByte() && bytes[3] == 0xE0.toByte()
+                        && bytes[4] == 0xA1.toByte() && bytes[5] == 0xB1.toByte() && bytes[6] == 0x1A.toByte() && bytes[7] == 0xE1.toByte() ->
+                        readXls(java.io.ByteArrayInputStream(bytes))
+                    else -> readCsv(java.io.ByteArrayInputStream(bytes))
                 }
                 buildRows(parsed)
             }
@@ -93,7 +97,11 @@ object SmsImport {
     }
 
     private fun parseCsvLine(line: String): List<String> {
-        val delim = if (line.contains('\t')) '\t' else ','
+        val delim = when {
+            line.contains('\t') -> '\t'
+            line.contains(';') && !line.contains(',') -> ';'
+            else -> ','
+        }
         val out = mutableListOf<String>()
         val cur = StringBuilder()
         var inQuotes = false
@@ -131,20 +139,46 @@ object SmsImport {
 
     // ---------- XLSX يدوي (zip + xml) ----------
 
-    private fun readXlsx(stream: InputStream): List<List<String>> {
-        val shared = mutableListOf<String>()
-        var sheetRows: MutableList<List<String>>? = null
-        val zip = ZipInputStream(stream)
-        var entry = zip.nextEntry
-        while (entry != null) {
-            when (entry.name) {
-                "xl/sharedStrings.xml" -> readSharedStrings(zip, shared)
-                "xl/worksheets/sheet1.xml" -> sheetRows = readSheet(zip, shared)
+    private fun readXlsx(bytes: ByteArray): List<List<String>> {
+        // تجميع أسماء الجداول أولاً (قد تكون sheet1 أو sheet أو غيرهما)
+        val sheetNames = mutableListOf<String>()
+        ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zin ->
+            var e = zin.nextEntry
+            while (e != null) {
+                if (e.name.startsWith("xl/worksheets/") && e.name.endsWith(".xml")) sheetNames.add(e.name)
+                zin.closeEntry()
+                e = zin.nextEntry
             }
-            zip.closeEntry()
-            entry = zip.nextEntry
         }
-        return sheetRows ?: emptyList()
+        for (name in sheetNames.sorted()) {
+            val rows = parseSheet(bytes, name) ?: continue
+            if (rows.isNotEmpty()) return rows
+        }
+        return emptyList()
+    }
+
+    private fun parseSheet(bytes: ByteArray, sheetName: String): List<List<String>>? {
+        // مرور واحد: قراءة sharedStrings أثناء السير حتى نصل للجدول المطلوب
+        val shared = mutableListOf<String>()
+        var found = false
+        var rows: MutableList<List<String>>? = null
+        ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zin ->
+            var e = zin.nextEntry
+            while (e != null) {
+                when {
+                    e.name == sheetName -> {
+                        rows = readSheet(zin, shared)
+                        found = true
+                        return@use
+                    }
+                    e.name == "xl/sharedStrings.xml" -> readSharedStrings(zin, shared)
+                    else -> zin.closeEntry()
+                }
+                e = zin.nextEntry
+            }
+        }
+        if (!found) return null
+        return rows
     }
 
     private fun newParser(zip: ZipInputStream) = XmlPullParserFactory.newInstance().newPullParser().apply {
@@ -240,6 +274,7 @@ object SmsImport {
         if (parsed.isEmpty()) return ImportResult(emptyList(), emptyList())
         var startIdx = 0
         var phoneIdx = 0
+        var subIdx = -1
         var nameIdx = 1
         var prevIdx = 2
         var curIdx = 3
@@ -248,16 +283,27 @@ object SmsImport {
 
         for (i in parsed.indices) {
             val names = parsed[i].map { it.trim() }
-            val phone = names.indexOfFirst { n -> PHONE_HEADERS.any { n.contains(it) } }
-            val name = names.indexOfFirst { n -> NAME_HEADERS.any { n == it && n.isNotBlank() } }
-            val prev = names.indexOfFirst { n -> PREV_HEADERS.any { n.contains(it) } }
-            val cur = names.indexOfFirst { n -> CUR_HEADERS.any { n.contains(it) } }
-            val arr = names.indexOfFirst { n -> ARR_HEADERS.any { n.contains(it) } }
-            val found = listOfNotNull(phone.takeIf { it >= 0 }, name.takeIf { it >= 0 }, prev.takeIf { it >= 0 }, cur.takeIf { it >= 0 }, arr.takeIf { it >= 0 })
+            val mobile = names.indexOfFirst { n -> MOBILE_HEADERS.any { it.isNotEmpty() && n.contains(it) } }
+            val sub = names.indexOfFirst { n -> SUB_HEADERS.any { it.isNotEmpty() && n.contains(it) } }
+            val name = names.indexOfFirst { n -> NAME_HEADERS.any { it.isNotEmpty() && n.contains(it) } }
+            val prev = names.indexOfFirst { n -> PREV_HEADERS.any { it.isNotEmpty() && n.contains(it) } }
+            val cur = names.indexOfFirst { n -> CUR_HEADERS.any { it.isNotEmpty() && n.contains(it) } }
+            val arr = names.indexOfFirst { n -> ARR_HEADERS.any { it.isNotEmpty() && n.contains(it) } }
+            val found = listOfNotNull(
+                mobile.takeIf { it >= 0 }, sub.takeIf { it >= 0 },
+                name.takeIf { it >= 0 }, prev.takeIf { it >= 0 },
+                cur.takeIf { it >= 0 }, arr.takeIf { it >= 0 }
+            )
             if (found.size >= 2) {
                 startIdx = i + 1
                 hasHeader = true
-                if (phone >= 0) phoneIdx = phone
+                if (mobile >= 0) {
+                    phoneIdx = mobile
+                    subIdx = sub
+                } else if (sub >= 0) {
+                    // لا يوجد عمود جوال: رقم المشترك هو رقم الإرسال
+                    phoneIdx = sub
+                }
                 if (name >= 0) nameIdx = name
                 if (prev >= 0) prevIdx = prev
                 if (cur >= 0) curIdx = cur
@@ -265,19 +311,21 @@ object SmsImport {
                 break
             }
         }
+        if (subIdx == phoneIdx) subIdx = -1
         if (!hasHeader) startIdx = 0
 
         val rows = mutableListOf<SmsRow>()
         val invalid = mutableListOf<String>()
         for (i in startIdx until parsed.size) {
             val row = parsed[i]
-            val maxIdx = maxOf(phoneIdx, nameIdx, prevIdx, curIdx, arrIdx)
+            val maxIdx = maxOf(phoneIdx, nameIdx, prevIdx, curIdx, arrIdx, subIdx)
             if (row.size <= maxIdx) continue
-            val phoneRaw = row[phoneIdx].trim()
-            val name = row[nameIdx].trim()
-            val prev = parseNum(row[prevIdx])
-            val cur = parseNum(row[curIdx])
-            val arr = parseNum(row[arrIdx])
+            val phoneRaw = row.getOrNull(phoneIdx)?.trim() ?: ""
+            val name = row.getOrNull(nameIdx)?.trim() ?: ""
+            val prev = parseNum(row.getOrNull(prevIdx) ?: "")
+            val cur = parseNum(row.getOrNull(curIdx) ?: "")
+            val arr = parseNum(row.getOrNull(arrIdx) ?: "")
+            val subNo = if (subIdx >= 0) (row.getOrNull(subIdx)?.trim() ?: "") else ""
             if (phoneRaw.isBlank()) continue
             val norm = SmsPhone.normalize(phoneRaw)
             if (SmsPhone.isValid(norm)) {
@@ -288,7 +336,8 @@ object SmsImport {
                         name = name,
                         prevReading = prev,
                         curReading = cur,
-                        arrears = arr
+                        arrears = arr,
+                        subscriberNo = subNo
                     )
                 )
             } else {
