@@ -49,6 +49,22 @@ class LocalStore(context: Context) {
         putJson("archive_payments", arr)
     }
 
+    fun loadMyPayments(): MutableList<PaymentRecord> {
+        val out = mutableListOf<PaymentRecord>()
+        getJsonArray("my_account_payments")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                arr.optJSONObject(i)?.let { out.add(PaymentRecord.from(it)) }
+            }
+        }
+        return out
+    }
+
+    fun saveMyPayments(list: List<PaymentRecord>) {
+        val arr = JSONArray()
+        list.forEach { arr.put(it.toJson()) }
+        putJson("my_account_payments", arr)
+    }
+
     fun loadPayments(): MutableList<PaymentRecord> {
         val out = mutableListOf<PaymentRecord>()
         getJsonArray("archive_payments")?.let { arr ->
