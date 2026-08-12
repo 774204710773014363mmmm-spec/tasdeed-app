@@ -90,7 +90,7 @@ fun LoginScreen(
     Box(
         modifier = modifier
             .padding(padding)
-            .background(Brush.verticalGradient(listOf(Color(0xFF047857), Color(0xFF059669), Color(0xFF10B981))))
+            .background(Brush.verticalGradient(listOf(Color(0xFF0284C7), Color(0xFF0369A1), Color(0xFF38BDF8))))
     ) {
         Column(
             modifier = Modifier
