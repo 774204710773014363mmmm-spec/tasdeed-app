@@ -23,7 +23,7 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
     NavigationBar {
         val items = listOf(
             NavItem("home", "الفواتير", Icons.Filled.ReceiptLong),
-            NavItem("free", "دفعات حرة", Icons.Filled.Payments),
+            NavItem("free", "حساباتي", Icons.Filled.AccountBalanceWallet),
             NavItem("archive", "الكشوفات", Icons.Filled.Archive),
             NavItem("settings", "الإعدادات", Icons.Filled.Settings)
         )
