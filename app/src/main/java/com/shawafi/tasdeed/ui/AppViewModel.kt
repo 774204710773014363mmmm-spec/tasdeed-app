@@ -34,6 +34,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val loading = MutableStateFlow(false)
     val message = MutableStateFlow<ToastMsg?>(null)
     val darkTheme = MutableStateFlow(store.getBool("theme", false))
+    val uiFps = MutableStateFlow(store.getInt("ui_fps", 60))
+    val nowTick = MutableStateFlow(System.currentTimeMillis())
 
     val subscribers = MutableStateFlow<List<Subscriber>>(emptyList())
     val locks = MutableStateFlow<Map<String, Long>>(emptyMap())
@@ -45,6 +47,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val freePayments = MutableStateFlow<List<FreePayment>>(emptyList())
 
     private var lockJob: Job? = null
+    private var frameJob: Job? = null
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> loadPendingList(key: String): MutableList<T> {
@@ -82,16 +85,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        // لا دخول تلقائي: دائماً تظهر شاشة تسجيل الدخول (ببيانات محفوظة إن وجدت)
         val savedUser = store.getString("saved_user")
-        if (savedUser != null && store.getString("remember_me") == "true") {
-            user.value = savedUser
+        if (savedUser != null) {
             repo.loadFromCache()
-            if (store.getString("current_branch") != null) {
-                branchKey.value = store.getString("current_branch")
-                isLoggedIn.value = true
-                branchName.value = repo.getBranches()[branchKey.value]?.name ?: ""
-                reloadSubscribers()
-                startLocksLoop()
+        }
+    }
+
+    fun setTheme(dark: Boolean) {
+        store.putBool("theme", dark)
+        darkTheme.value = dark
+    }
+
+    fun setUiFps(fps: Int) {
+        store.putInt("ui_fps", fps)
+        uiFps.value = fps
+        startFrameTick()
+    }
+
+    private fun startFrameTick() {
+        frameJob?.cancel()
+        frameJob = viewModelScope.launch {
+            val fps = uiFps.value.coerceIn(1, 120)
+            while (true) {
+                nowTick.value = System.currentTimeMillis()
+                delay(1000L / fps)
             }
         }
     }
@@ -150,6 +168,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun logout() {
         lockJob?.cancel()
+        frameJob?.cancel()
         repo.setSession(null, null)
         isLoggedIn.value = false
         user.value = null
@@ -173,10 +192,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startLocksLoop() {
         lockJob?.cancel()
+        // حلقة الفريمات: تحدّث nowTick بسلاسة حسب fps المختار
+        startFrameTick()
+        // حلقة الأقفال: جلب من النت كل 10 ثوانٍ فقط (لا نضرب الشبكة بالفريمات)
         lockJob = viewModelScope.launch {
             while (true) {
                 withContext(Dispatchers.IO) {
-                    try { locks.value = repo.fetchLocks() } catch (e: Exception) {}
+                    try {
+                        val fetched = repo.fetchLocks()
+                        if (fetched.isNotEmpty() || locks.value.isNotEmpty()) locks.value = fetched
+                    } catch (e: Exception) {}
                 }
                 delay(10000)
             }
