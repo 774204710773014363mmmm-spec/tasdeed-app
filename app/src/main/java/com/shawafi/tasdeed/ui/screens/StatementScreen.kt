@@ -5,11 +5,13 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Download
@@ -27,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
@@ -41,7 +44,7 @@ enum class StatementSort(val label: String) {
     METER("🔢 رقم العداد (تصاعدي)")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun StatementScreen(
     vm: AppViewModel,
@@ -73,6 +76,7 @@ fun StatementScreen(
     var editMode by remember { mutableStateOf(false) }
     var editedAmounts by remember { mutableStateOf<MutableMap<String, Double>>(mutableMapOf()) }
     var editTarget by remember { mutableStateOf<ReportExporter.SubGroup?>(null) }
+    var subEdits by remember { mutableStateOf<MutableMap<String, Double>>(mutableMapOf()) }
 
     fun shareFile(file: File) {
         val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
@@ -286,12 +290,11 @@ fun StatementScreen(
     editTarget?.let { target ->
         val raw = if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList()
         val subPays = raw.filter { it.subscriberId.ifEmpty { it.meterNumber.ifEmpty { it.subscriberName } } == target.key }
-        var subEdits by remember { mutableStateOf<MutableMap<String, Double>>(mutableMapOf()) }
         Dialog(onDismissRequest = { editTarget = null }) {
-            Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp)) {
+            Surface(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.padding(20.dp).heightIn(max = 480.dp)) {
                     Text("✏️ تعديل: ${target.name}", fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${subPays.size} دفعة | اضغط مطولاً على المشترك لفتح هذا", fontSize = 11.5.sp, color = Color.Gray)
+                    Text("${subPays.size} دفعة", fontSize = 11.5.sp, color = Color.Gray)
                     Spacer(Modifier.height(10.dp))
                     if (subPays.isEmpty()) {
                         Text("لا توجد دفعات", color = Color.Gray)
