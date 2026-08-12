@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.screens.ArchiveScreen
@@ -36,8 +39,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             val appVm: AppViewModel = viewModel()
             val dark by appVm.darkTheme.collectAsState()
+            val fs by appVm.fontScale.collectAsState()
+            val density = LocalDensity.current
             TasdeedTheme(dark = dark) {
-                MainApp(appVm)
+                CompositionLocalProvider(
+                    LocalDensity provides Density(density.density, density.fontScale * (fs / 100f))
+                ) {
+                    MainApp(appVm)
+                }
             }
         }
     }
