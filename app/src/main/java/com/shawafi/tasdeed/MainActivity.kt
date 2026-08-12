@@ -34,8 +34,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            TasdeedTheme {
-                MainApp()
+            val appVm: AppViewModel = viewModel()
+            val dark by appVm.darkTheme.collectAsState()
+            TasdeedTheme(dark = dark) {
+                MainApp(appVm)
             }
         }
     }
