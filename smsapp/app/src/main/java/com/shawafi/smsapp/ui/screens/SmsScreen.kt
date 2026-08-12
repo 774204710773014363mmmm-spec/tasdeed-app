@@ -293,6 +293,9 @@ private fun SmsRowCard(
                 Column(Modifier.weight(1f)) {
                     Text(row.name.ifBlank { row.phone }, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Text(row.phone, style = MaterialTheme.typography.bodySmall, color = Color(0xFF616161))
+                    if (row.subscriberNo.isNotEmpty()) {
+                        Text("رقم المشترك: " + row.subscriberNo, style = MaterialTheme.typography.bodySmall, color = Color(0xFF455A64))
+                    }
                     row.prevReading?.let { prev ->
                         row.curReading?.let { cur ->
                             val cons = (cur - prev).coerceAtLeast(0.0)
@@ -408,7 +411,7 @@ private fun SettingsTab(vm: AppViewModel) {
                         modifier = Modifier.fillMaxWidth(), minLines = 4
                     )
                     Text(
-                        "🅿️ المتغيرات: {name} الاسم • {phone} الجوال • {prev} القراءة السابقة • {cur} الحالية • {cons} الاستهلاك • {kwh} السعر • {fee} الاشتراك • {amount} القيمة • {ar} المتأخرات • {total} الإجمالي",
+                        "🅿️ المتغيرات: {name} الاسم • {phone} الجوال • {sub} رقم المشترك • {prev} القراءة السابقة • {cur} الحالية • {cons} الاستهلاك • {kwh} السعر • {fee} الاشتراك • {amount} القيمة • {ar} المتأخرات • {total} الإجمالي",
                         style = MaterialTheme.typography.bodySmall, color = Color(0xFF37474F)
                     )
                     HorizontalDivider(Modifier.padding(vertical = 8.dp))
