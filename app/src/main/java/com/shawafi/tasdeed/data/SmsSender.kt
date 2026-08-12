@@ -71,7 +71,7 @@ object SmsSender {
             if (parts.size == 1) {
                 sms.sendTextMessage(phone, null, message, pIntents[0], null)
             } else {
-                sms.sendMultipartTextMessage(phone, null, parts, pIntents, null)
+                sms.sendMultipartTextMessage(phone, null, parts, java.util.ArrayList(pIntents), null)
             }
             true
         } catch (e: Exception) {
