@@ -4,7 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,12 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
-import com.shawafi.tasdeed.data.PaymentRecord
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
 import kotlinx.coroutines.Dispatchers
@@ -32,17 +31,25 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun FreeScreen(
     vm: AppViewModel,
     modifier: Modifier = Modifier,
     padding: PaddingValues,
-    onNav: (String) -> Unit
+    onNav: (String) -> Unit,
+    onOpenStatement: (String, Int, String) -> Unit
 ) {
     var showAdd by remember { mutableStateOf(false) }
-    var menuOpen by remember { mutableStateOf(false) }
+    var showNew by remember { mutableStateOf(false) }
+    var dlOpen by remember { mutableStateOf(false) }
+    var shOpen by remember { mutableStateOf(false) }
+    var menuTarget by remember { mutableStateOf<Int?>(null) }
+    var renameTarget by remember { mutableStateOf<Int?>(null) }
+    var infoTarget by remember { mutableStateOf<Int?>(null) }
+    var deleteTarget by remember { mutableStateOf<Int?>(null) }
     val myPayments by vm.myAccountPayments.collectAsState()
+    val myPeriods by vm.myPeriods.collectAsState()
     val total = myPayments.sumOf { it.amount }
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -117,63 +124,48 @@ fun FreeScreen(
     Column(modifier = modifier.padding(padding)) {
         TopBar(vm, "حساباتي", onRefresh = { vm.reloadMyAccount() })
 
-        if (myPayments.isEmpty()) {
-            Box(Modifier.fillMaxWidth().padding(vertical = 50.dp), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("💼", fontSize = 40.sp)
-                    Text("لا توجد دفعات بعد", color = Color.Gray, fontSize = 14.sp)
-                }
-            }
-        } else {
-            // جدول كامل بكل عمليات الحساب
-            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
-                item {
-                    Row(Modifier.fillMaxWidth().background(Green).padding(vertical = 10.dp, horizontal = 8.dp)) {
-                        Text("#", Modifier.width(28.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
-                        Text("التاريخ", Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
-                        Text("ملاحظة", Modifier.weight(1.2f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, textAlign = TextAlign.Center)
-                        Text("المبلغ", Modifier.weight(0.9f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, textAlign = TextAlign.End)
+        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("💼 الحساب الحالي", fontWeight = FontWeight.Bold)
+                        Text("${myPayments.size} دفعة | ${formatNum(total)} د.ع", fontSize = 13.sp, color = Color.Gray)
+                        Spacer(Modifier.height(8.dp))
+                        if (myPayments.isNotEmpty()) {
+                            OutlinedButton(
+                                onClick = { onOpenStatement("حساباتي الحالية", -1, "my") },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("📄 عرض الكشف") }
+                        }
                     }
                 }
-                items(myPayments.sortedByDescending { it.createdAt }, key = { it.localId }) { p ->
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .background(if (myPayments.indexOf(p) % 2 == 0) Color(0xFFF6F9F7) else Color.White)
-                            .padding(vertical = 10.dp, horizontal = 8.dp)
-                    ) {
-                        Text("${myPayments.indexOf(p) + 1}", Modifier.width(28.dp), fontSize = 12.sp, color = Color.Gray)
-                        Text(p.paymentDate, Modifier.weight(1f), fontSize = 12.sp)
-                        Text(p.note.ifEmpty { "-" }, Modifier.weight(1.2f), fontSize = 12.sp, color = Color.Gray, textAlign = TextAlign.Center)
-                        Text(formatNum(p.amount), Modifier.weight(0.9f), fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Green, textAlign = TextAlign.End)
+            }
+            item {
+                Button(
+                    onClick = { showNew = true },
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Green)
+                ) { Text("➕ فتح كشف حساباتي جديد", fontWeight = FontWeight.Bold) }
+            }
+            item { Text("💼 الكشوفات السابقة", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
+            items(myPeriods, key = { it.name + it.createdAt }) { p ->
+                val pIdx = myPeriods.indexOf(p)
+                Card(modifier = Modifier.fillMaxWidth().combinedClickable(
+                    onClick = { onOpenStatement(p.name, pIdx, "my") },
+                    onLongClick = { menuTarget = pIdx }
+                )) {
+                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("📁 ${p.name}", fontWeight = FontWeight.SemiBold)
+                            Text("${p.payments.size} دفعة | ${formatNum(p.payments.sumOf { it.amount })} د.ع", fontSize = 12.sp, color = Color.Gray)
+                        }
+                        Text("🗓 ${p.createdAt}", fontSize = 11.sp, color = Color.Gray)
                     }
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
                 }
             }
-        }
-
-        // الإجمالي مثبت أسفل الشاشة دائماً
-        if (myPayments.isNotEmpty()) {
-            Row(
-                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("الإجمالي الكلي:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Spacer(Modifier.weight(1f))
-                Text("${formatNum(total)} د.ع", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Green)
+            if (myPeriods.isEmpty()) {
+                item { Box(Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) { Text("لا توجد كشوفات سابقة", color = Color.Gray) } }
             }
-        }
-
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Button(
-                onClick = { showAdd = true },
-                modifier = Modifier.weight(1f).height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Green)
-            ) { Text("➕ تسجيل دفعة", fontWeight = FontWeight.Bold) }
-            OutlinedButton(
-                onClick = { menuOpen = true },
-                modifier = Modifier.weight(1f).height(48.dp),
-                enabled = myPayments.isNotEmpty() && !exporting
-            ) { Text("📤 مشاركة / حفظ") }
         }
 
         if (exporting) {
@@ -183,29 +175,57 @@ fun FreeScreen(
                 Text("🔄 جاري إنشاء الملف...", fontSize = 12.sp, color = Color.Gray)
             }
         }
+
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            OutlinedButton(
+                onClick = { shOpen = true },
+                modifier = Modifier.weight(1f).height(48.dp),
+                enabled = myPayments.isNotEmpty() && !exporting
+            ) { Text("📤 مشاركة") }
+            OutlinedButton(
+                onClick = { dlOpen = true },
+                modifier = Modifier.weight(1f).height(48.dp),
+                enabled = myPayments.isNotEmpty() && !exporting
+            ) { Text("💾 تنزيل") }
+            Button(
+                onClick = { showAdd = true },
+                modifier = Modifier.weight(1.1f).height(48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Green)
+            ) { Text("➕ تسجيل دفعة", fontWeight = FontWeight.Bold) }
+        }
     }
 
-    // قائمة منبثقة من الأسفل (ModalBottomSheet)
-    if (menuOpen) {
-        ModalBottomSheet(onDismissRequest = { menuOpen = false }) {
-            Column(Modifier.padding(bottom = 24.dp)) {
-                Text("📤 كشف حساباتي", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
+    // قائمة سفلية للمشاركة فقط
+    if (shOpen) {
+        ModalBottomSheet(onDismissRequest = { shOpen = false }) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                Text("📤 مشاركة كشف حساباتي", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
                 ListItem(
                     headlineContent = { Text("📄 مشاركة PDF") },
-                    modifier = Modifier.clickable { menuOpen = false; doShare("pdf") }
+                    modifier = Modifier.clickable { shOpen = false; doShare("pdf") }
                 )
                 ListItem(
                     headlineContent = { Text("📊 مشاركة Excel") },
-                    modifier = Modifier.clickable { menuOpen = false; doShare("xls") }
+                    modifier = Modifier.clickable { shOpen = false; doShare("xls") }
                 )
-                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 4.dp))
+            }
+        }
+    }
+
+    // قائمة سفلية للتنزيل فقط
+    if (dlOpen) {
+        ModalBottomSheet(onDismissRequest = { dlOpen = false }) {
+            Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                Text("💾 تنزيل كشف حساباتي", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
                 ListItem(
-                    headlineContent = { Text("💾 حفظ PDF في الجوال") },
-                    modifier = Modifier.clickable { menuOpen = false; savePdf.launch("حساباتي.pdf") }
+                    headlineContent = { Text("📄 تنزيل PDF") },
+                    supportingContent = { Text("حفظ في الجوال (اختر المكان)") },
+                    modifier = Modifier.clickable { dlOpen = false; savePdf.launch("حساباتي.pdf") }
                 )
                 ListItem(
-                    headlineContent = { Text("📁 حفظ Excel في الجوال") },
-                    modifier = Modifier.clickable { menuOpen = false; saveExcel.launch("حساباتي.xls") }
+                    headlineContent = { Text("📊 تنزيل Excel") },
+                    supportingContent = { Text("حفظ في الجوال (اختر المكان)") },
+                    modifier = Modifier.clickable { dlOpen = false; saveExcel.launch("حساباتي.xls") }
                 )
             }
         }
@@ -213,6 +233,77 @@ fun FreeScreen(
 
     if (showAdd) {
         AddMyPaymentDialog(vm, onDismiss = { showAdd = false })
+    }
+
+    // قائمة الضغطة المطولة على كشف سابق
+    val menuIdx = menuTarget
+    if (menuIdx != null) {
+        val p = myPeriods.getOrNull(menuIdx)
+        if (p != null) {
+            ModalBottomSheet(onDismissRequest = { menuTarget = null }) {
+                Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+                    Text("📁 ${p.name}", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
+                    ListItem(
+                        headlineContent = { Text("✏️ تعديل اسم الكشف") },
+                        modifier = Modifier.clickable { menuTarget = null; renameTarget = menuIdx }
+                    )
+                    ListItem(
+                        headlineContent = { Text("ℹ️ معلومات الكشف") },
+                        modifier = Modifier.clickable { menuTarget = null; infoTarget = menuIdx }
+                    )
+                    ListItem(
+                        headlineContent = { Text("🗑 حذف الكشف", color = Color(0xFFDC2626)) },
+                        modifier = Modifier.clickable { menuTarget = null; deleteTarget = menuIdx }
+                    )
+                }
+            }
+        } else {
+            menuTarget = null
+        }
+    }
+
+    // تعديل اسم الكشف
+    val renIdx = renameTarget
+    if (renIdx != null) {
+        val p = myPeriods.getOrNull(renIdx)
+        if (p != null) {
+            RenamePeriodDialog(p.name, onSave = { vm.renameMyPeriod(renIdx, it) }) { renameTarget = null }
+        } else {
+            renameTarget = null
+        }
+    }
+
+    // معلومات الكشف
+    val infIdx = infoTarget
+    if (infIdx != null) {
+        val p = myPeriods.getOrNull(infIdx)
+        if (p != null) {
+            PeriodInfoDialog(vm, p) { infoTarget = null }
+        } else {
+            infoTarget = null
+        }
+    }
+
+    // تأكيد الحذف
+    val delIdx = deleteTarget
+    if (delIdx != null) {
+        val p = myPeriods.getOrNull(delIdx)
+        if (p != null) {
+            DeletePeriodDialog(p.name, onConfirm = { vm.deleteMyPeriod(delIdx) }) { deleteTarget = null }
+        } else {
+            deleteTarget = null
+        }
+    }
+
+    // فتح كشف جديد
+    if (showNew) {
+        NewPeriodDialog(
+            title = "➕ فتح كشف حساباتي جديد",
+            subtitle = "سيتم نقل دفعات الحساب الحالي إلى الكشف الجديد",
+            buttonText = "فتح",
+            onOpen = { vm.newMyPeriod(it) },
+            onDismiss = { showNew = false }
+        )
     }
 }
 
