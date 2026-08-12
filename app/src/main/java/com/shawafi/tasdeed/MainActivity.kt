@@ -7,18 +7,15 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.fragment.app.FragmentActivity
-import com.shawafi.tasdeed.data.SmsSender
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.screens.ArchiveScreen
 import com.shawafi.tasdeed.ui.screens.BottomNavBar
@@ -26,7 +23,6 @@ import com.shawafi.tasdeed.ui.screens.FreeScreen
 import com.shawafi.tasdeed.ui.screens.HomeScreen
 import com.shawafi.tasdeed.ui.screens.LoginScreen
 import com.shawafi.tasdeed.ui.screens.SettingsScreen
-import com.shawafi.tasdeed.ui.screens.SmsScreen
 import com.shawafi.tasdeed.ui.screens.StatementScreen
 import com.shawafi.tasdeed.ui.theme.TasdeedTheme
 import androidx.compose.material3.Scaffold
@@ -63,13 +59,6 @@ fun MainApp(vm: AppViewModel = viewModel()) {
     val msg by vm.message.collectAsState()
     var screen by remember { mutableStateOf("home") }
     var statement by remember { mutableStateOf<Triple<String, Int, String>?>(null) }
-    val context = LocalContext.current
-
-    // مستقبِل نتائج إرسال SMS (مفعل طوال عمر التطبيق)
-    DisposableEffect(Unit) {
-        val receiver = SmsSender.register(context) { rowId, ok -> vm.smsResult(rowId, ok) }
-        onDispose { SmsSender.unregister(context, receiver) }
-    }
 
     LaunchedEffect(msg) {
         msg?.let {
@@ -84,7 +73,7 @@ fun MainApp(vm: AppViewModel = viewModel()) {
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            if (loggedIn && statement == null && screen != "sms") {
+            if (loggedIn && statement == null) {
                 BottomNavBar(vm, screen) { screen = it }
             }
         }
@@ -115,7 +104,6 @@ fun MainNav(
         "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement)
         "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement)
         "settings" -> SettingsScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
-        "sms" -> SmsScreen(vm, Modifier.fillMaxSize(), padding, onBack = { onNav("settings") })
         else -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
     }
 }
