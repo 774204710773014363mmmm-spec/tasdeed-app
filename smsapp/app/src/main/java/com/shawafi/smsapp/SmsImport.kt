@@ -32,7 +32,7 @@ object SmsImport {
                 val bytes = stream.readBytes()
                 val parsed: List<List<String>> = when {
                     // كشف النوع من محتوى الملف نفسه وليس من اسمه
-                    bytes.size >= 4 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte() && bytes[2] == 3 && bytes[3] == 4 ->
+                    bytes.size >= 4 && bytes[0] == 'P'.code.toByte() && bytes[1] == 'K'.code.toByte() && bytes[2].toInt() == 3 && bytes[3].toInt() == 4 ->
                         readXlsx(bytes)
                     bytes.size >= 8 && bytes[0] == 0xD0.toByte() && bytes[1] == 0xCF.toByte() && bytes[2] == 0x11.toByte() && bytes[3] == 0xE0.toByte()
                         && bytes[4] == 0xA1.toByte() && bytes[5] == 0xB1.toByte() && bytes[6] == 0x1A.toByte() && bytes[7] == 0xE1.toByte() ->
