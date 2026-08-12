@@ -1,0 +1,12 @@
+# ملفات البناء والمحلية
+.gradle/
+build/
+app/build/
+.idea/
+*.iml
+*.pyc
+__pycache__/
+
+# أسرار وأدوات
+gh_token.txt
+رسائل_نقي.apk
