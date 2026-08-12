@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sort
@@ -176,27 +177,57 @@ fun StatementScreen(
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Green, titleContentColor = Color.White, actionIconContentColor = Color.White)
         )
 
-        DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
-            StatementSort.entries.forEach { s ->
-                DropdownMenuItem(
-                    text = { Text(s.label, fontWeight = if (s == sortMode) FontWeight.Bold else FontWeight.Normal) },
-                    onClick = { sortMode = s; sortOpen = false }
-                )
+        // قائمة سفلية (ModalBottomSheet) للترتيب
+        if (sortOpen) {
+            ModalBottomSheet(onDismissRequest = { sortOpen = false }) {
+                Column(Modifier.fillMaxWidth().padding(bottom = 28.dp)) {
+                    Text("🔃 ترتيب الكشف", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    StatementSort.entries.forEach { s ->
+                        ListItem(
+                            headlineContent = { Text(s.label, fontWeight = if (s == sortMode) FontWeight.Bold else FontWeight.Normal) },
+                            trailingContent = { if (s == sortMode) Icon(Icons.Filled.Check, contentDescription = "محدد", tint = Green) },
+                            modifier = Modifier.clickable { sortMode = s; sortOpen = false }
+                        )
+                    }
+                }
             }
         }
 
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(text = { Text("📄 PDF") }, onClick = { menuOpen = false; doDownload("pdf") })
-            DropdownMenuItem(text = { Text("📊 Excel") }, onClick = { menuOpen = false; doDownload("xls") })
+        // قائمة سفلية (ModalBottomSheet) لخيارات PDF/Excel
+        if (menuOpen) {
+            ModalBottomSheet(onDismissRequest = { menuOpen = false }) {
+                Column(Modifier.fillMaxWidth().padding(bottom = 28.dp)) {
+                    Text("📤 $name", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    ListItem(
+                        headlineContent = { Text("📄 تنزيل PDF") },
+                        supportingContent = { Text("حفظ في الجوال (اختر المكان)") },
+                        modifier = Modifier.clickable { menuOpen = false; doDownload("pdf") }
+                    )
+                    ListItem(
+                        headlineContent = { Text("📊 تنزيل Excel") },
+                        supportingContent = { Text("حفظ في الجوال (اختر المكان)") },
+                        modifier = Modifier.clickable { menuOpen = false; doDownload("xls") }
+                    )
+                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 4.dp))
+                    ListItem(
+                        headlineContent = { Text("📤 مشاركة PDF") },
+                        modifier = Modifier.clickable { menuOpen = false; doShare("pdf") }
+                    )
+                    ListItem(
+                        headlineContent = { Text("📤 مشاركة Excel") },
+                        modifier = Modifier.clickable { menuOpen = false; doShare("xls") }
+                    )
+                }
+            }
         }
 
         if (grouped.isEmpty()) {
-            Box(Modifier.fillMaxWidth().padding(vertical = 60.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 60.dp), contentAlignment = Alignment.Center) {
                 Text("📦 لا توجد مدفوعات في هذا الكشف", color = Color.Gray)
             }
         } else if (!editMode) {
             // جدول كامل بكل العمليات - أعمدة متسعة لعرض الأسماء كاملة
-            LazyColumn(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                 item {
                     Row(Modifier.fillMaxWidth().background(Green).padding(vertical = 10.dp, horizontal = 8.dp)) {
                         Text("#", Modifier.width(28.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
@@ -224,14 +255,6 @@ fun StatementScreen(
                     }
                     HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
                 }
-                item { Spacer(Modifier.height(12.dp)) }
-                item {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("الإجمالي الكلي:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Spacer(Modifier.weight(1f))
-                        Text("${formatNum(total)} د.ع", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Green)
-                    }
-                }
             }
         } else {
             // وضع التعديل الكامل
@@ -255,6 +278,18 @@ fun StatementScreen(
                     }
                 }
                 Text("💾 الإجمالي: ${formatNum(editedAmounts.values.sum())} د.ع", fontSize = 13.sp, color = Green, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+            }
+        }
+
+        // الإجمالي الكلي - مثبت أسفل الشاشة دائماً (حتى لو الأسماء قليلة)
+        if (grouped.isNotEmpty() && !editMode) {
+            Row(
+                Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("الإجمالي الكلي:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(Modifier.weight(1f))
+                Text("${formatNum(total)} د.ع", fontWeight = FontWeight.Bold, fontSize = 17.sp, color = Green)
             }
         }
 
