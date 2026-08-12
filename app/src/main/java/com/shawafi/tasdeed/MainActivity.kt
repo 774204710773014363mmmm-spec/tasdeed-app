@@ -58,7 +58,7 @@ fun MainApp(vm: AppViewModel = viewModel()) {
     val snackbar = remember { SnackbarHostState() }
     val msg by vm.message.collectAsState()
     var screen by remember { mutableStateOf("home") }
-    var statement by remember { mutableStateOf<Pair<String, Int>?>(null) }
+    var statement by remember { mutableStateOf<Triple<String, Int, String>?>(null) }
 
     LaunchedEffect(msg) {
         msg?.let {
@@ -81,9 +81,9 @@ fun MainApp(vm: AppViewModel = viewModel()) {
         if (loggedIn) {
             val stmt = statement
             if (stmt != null) {
-                StatementScreen(vm, stmt.first, stmt.second, onBack = { statement = null })
+                StatementScreen(vm, stmt.first, stmt.second, kind = stmt.third, onBack = { statement = null })
             } else {
-                MainNav(vm, screen, padding, onNav = { screen = it }, onOpenStatement = { name, idx -> statement = name to idx })
+                MainNav(vm, screen, padding, onNav = { screen = it }, onOpenStatement = { name, idx, kind -> statement = Triple(name, idx, kind) })
             }
         } else {
             LoginScreen(vm, Modifier.fillMaxSize(), padding)
@@ -97,11 +97,11 @@ fun MainNav(
     screen: String,
     padding: androidx.compose.foundation.layout.PaddingValues,
     onNav: (String) -> Unit,
-    onOpenStatement: (String, Int) -> Unit = { _, _ -> }
+    onOpenStatement: (String, Int, String) -> Unit = { _, _, _ -> }
 ) {
     when (screen) {
         "home" -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
-        "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
+        "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement)
         "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement)
         "settings" -> SettingsScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
         else -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
