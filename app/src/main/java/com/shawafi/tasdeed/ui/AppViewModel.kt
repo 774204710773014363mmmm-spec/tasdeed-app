@@ -45,6 +45,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val currentPayments = MutableStateFlow<MutableList<PaymentRecord>>(store.loadPayments())
     val periods = MutableStateFlow<MutableList<Period>>(store.loadPeriods())
     val myAccountPayments = MutableStateFlow<MutableList<PaymentRecord>>(store.loadMyPayments())
+    val myPeriods = MutableStateFlow<MutableList<Period>>(store.loadMyPeriods())
     val pendingPayments = MutableStateFlow<MutableList<PaymentRecord>>(loadPendingList("pending_payments"))
     val pendingFreePayments = MutableStateFlow<MutableList<FreePayment>>(loadPendingList("pending_free_payments"))
     val freePayments = MutableStateFlow<List<FreePayment>>(emptyList())
@@ -208,8 +209,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reloadSubscribers() {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { repo.fetchSubscribers() }
-            subscribers.value = repo.getSubscribers().values.sortedBy { it.name }
+            try {
+                val list = withContext(Dispatchers.IO) { repo.fetchSubscribers() }
+                subscribers.value = list.values.sortedBy { it.name }
+            } catch (e: Exception) {
+                // بدون إنترنت: نعرض المخبأ المحلي حتى لا ينهار التطبيق
+                subscribers.value = repo.getSubscribers().values.sortedBy { it.name }
+            }
         }
     }
 
@@ -312,6 +318,64 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reloadMyAccount() {
         myAccountPayments.value = store.loadMyPayments()
+        myPeriods.value = store.loadMyPeriods()
+    }
+
+    fun newMyPeriod(name: String) {
+        val old = myAccountPayments.value
+        val p = Period(
+            name = name,
+            payments = old.toMutableList(),
+            createdAt = repo.currentDate(),
+            closedAt = System.currentTimeMillis()
+        )
+        myPeriods.value = (myPeriods.value + p).toMutableList()
+        myAccountPayments.value = mutableListOf()
+        store.saveMyPayments(myAccountPayments.value)
+        store.saveMyPeriods(myPeriods.value)
+        toast("✅ تم فتح كشف حساباتي جديد: $name")
+    }
+
+    fun deleteMyPeriod(idx: Int) {
+        if (idx in myPeriods.value.indices) {
+            val list = myPeriods.value.toMutableList()
+            list.removeAt(idx)
+            myPeriods.value = list
+            store.saveMyPeriods(list)
+            toast("تم حذف الكشف من حساباتي")
+        }
+    }
+
+    fun renameMyPeriod(idx: Int, newName: String) {
+        if (idx in myPeriods.value.indices && newName.isNotBlank()) {
+            val list = myPeriods.value.toMutableList()
+            list[idx] = list[idx].copy(name = newName.trim())
+            myPeriods.value = list
+            store.saveMyPeriods(list)
+            toast("✅ تم تعديل الاسم")
+        }
+    }
+
+    fun saveEditedMyPeriod(isCurrent: Boolean, idx: Int, editedIds: Set<String>, newAmounts: Map<String, Double>) {
+        val list = if (isCurrent) myAccountPayments.value else myPeriods.value.getOrNull(idx)?.payments?.toMutableList() ?: return
+        val newList = mutableListOf<PaymentRecord>()
+        list.forEach { pay ->
+            if (pay.localId in editedIds) {
+                val amt = newAmounts[pay.localId] ?: pay.amount
+                if (amt > 0) newList.add(pay.copy(amount = amt))
+            } else {
+                newList.add(pay)
+            }
+        }
+        if (isCurrent) {
+            myAccountPayments.value = newList.toMutableList()
+            store.saveMyPayments(myAccountPayments.value)
+        } else if (idx in myPeriods.value.indices) {
+            myPeriods.value[idx].payments.clear()
+            myPeriods.value[idx].payments.addAll(newList)
+            store.saveMyPeriods(myPeriods.value)
+        }
+        toast("✅ تم حفظ التعديلات")
     }
 
     fun syncPendingPayments() {
@@ -416,6 +480,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             periods.value = list
             store.savePeriods(list)
             toast("تم حذف الكشف")
+        }
+    }
+
+    fun renamePeriod(idx: Int, newName: String) {
+        if (idx in periods.value.indices && newName.isNotBlank()) {
+            val list = periods.value.toMutableList()
+            list[idx] = list[idx].copy(name = newName.trim())
+            periods.value = list
+            store.savePeriods(list)
+            toast("✅ تم تعديل الاسم")
         }
     }
 
