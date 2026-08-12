@@ -65,6 +65,42 @@ class LocalStore(context: Context) {
         putJson("my_account_payments", arr)
     }
 
+    fun saveMyPeriods(list: List<Period>) {
+        val arr = JSONArray()
+        list.forEach { p ->
+            val o = JSONObject()
+            o.put("name", p.name)
+            o.put("created_at", p.createdAt)
+            o.put("closed_at", p.closedAt)
+            val pays = JSONArray()
+            p.payments.forEach { pays.put(it.toJson()) }
+            o.put("payments", pays)
+            arr.put(o)
+        }
+        putJson("my_account_periods", arr)
+    }
+
+    fun loadMyPeriods(): MutableList<Period> {
+        val out = mutableListOf<Period>()
+        getJsonArray("my_account_periods")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val p = Period(
+                    name = o.optString("name"),
+                    createdAt = o.optString("created_at"),
+                    closedAt = o.optLong("closed_at", System.currentTimeMillis())
+                )
+                o.optJSONArray("payments")?.let { pays ->
+                    for (j in 0 until pays.length()) {
+                        pays.optJSONObject(j)?.let { p.payments.add(PaymentRecord.from(it)) }
+                    }
+                }
+                out.add(p)
+            }
+        }
+        return out
+    }
+
     fun loadPayments(): MutableList<PaymentRecord> {
         val out = mutableListOf<PaymentRecord>()
         getJsonArray("archive_payments")?.let { arr ->
