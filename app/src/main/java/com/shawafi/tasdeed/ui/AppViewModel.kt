@@ -36,6 +36,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val darkTheme = MutableStateFlow(store.getBool("theme", false))
     val uiFps = MutableStateFlow(store.getInt("ui_fps", 60))
     val fontScale = MutableStateFlow(store.getInt("font_scale", 100))
+    val bioEnabled = MutableStateFlow(store.getBool("bio_enabled"))
     val nowTick = MutableStateFlow(System.currentTimeMillis())
 
     val subscribers = MutableStateFlow<List<Subscriber>>(emptyList())
@@ -108,6 +109,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setFontScale(percent: Int) {
         store.putInt("font_scale", percent)
         fontScale.value = percent
+    }
+
+    fun setBioEnabled(on: Boolean) {
+        store.putBool("bio_enabled", on)
+        bioEnabled.value = on
+    }
+
+    fun hasSavedCredentials(): Boolean =
+        !store.getString("saved_user").isNullOrBlank() && !store.getString("saved_pass").isNullOrBlank()
+
+    fun loginWithSavedCredentials() {
+        val u = store.getString("saved_user") ?: return
+        val p = store.getString("saved_pass") ?: return
+        if (isLoggedIn.value) return
+        login(u, p, remember = true, useNetwork = true)
     }
 
     private fun startFrameTick() {
