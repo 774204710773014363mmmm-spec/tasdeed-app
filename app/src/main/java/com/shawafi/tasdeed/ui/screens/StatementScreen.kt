@@ -35,6 +35,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.content.FileProvider
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
+import com.shawafi.tasdeed.ui.theme.GreenBrush
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -157,6 +158,7 @@ fun StatementScreen(
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         TopAppBar(
+            modifier = Modifier.background(GreenBrush),
             title = {
                 Column {
                     Text(if (isCurrent) "📋 $name" else "📁 $name", fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -175,7 +177,7 @@ fun StatementScreen(
                     Icon(Icons.Filled.Share, contentDescription = "مشاركة", tint = Color.White)
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Green, titleContentColor = Color.White, actionIconContentColor = Color.White)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent, titleContentColor = Color.White, actionIconContentColor = Color.White)
         )
 
         // قائمة سفلية (ModalBottomSheet) للترتيب
