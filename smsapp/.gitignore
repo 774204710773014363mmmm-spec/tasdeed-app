@@ -6,8 +6,10 @@ app/build/
 *.iml
 *.pyc
 __pycache__/
+joblog.txt
+joblog.zip
 
 # أسرار وأدوات
 gh_token.txt
-رسائل_نقي.apkjoblog.txt
-joblog.zip
+رسائل_نقي.apk
+كشف_تجريبي_الرسائل.xlsx
