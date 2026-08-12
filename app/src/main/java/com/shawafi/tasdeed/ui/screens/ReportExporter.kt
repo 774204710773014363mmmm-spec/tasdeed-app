@@ -12,8 +12,17 @@ object ReportExporter {
 
     private val numFmt: NumberFormat get() = NumberFormat.getNumberInstance(Locale.US)
 
-    fun exportPdf(out: OutputStream, vm: AppViewModel, periodName: String, list: List<PaymentRecord>) {
-        val grouped = groupPayments(list).sortedByDescending { it.latestDate }
+    private fun sorted(list: List<PaymentRecord>, sort: StatementSort): List<SubGroup> {
+        val g = groupPayments(list)
+        return when (sort) {
+            StatementSort.NAME -> g.sortedBy { it.name }
+            StatementSort.METER -> g.sortedBy { it.meter.toLongOrNull() ?: Long.MAX_VALUE }
+            StatementSort.DATE -> g.sortedByDescending { it.latestDate }
+        }
+    }
+
+    fun exportPdf(out: OutputStream, vm: AppViewModel, periodName: String, list: List<PaymentRecord>, sort: StatementSort = StatementSort.DATE) {
+        val grouped = sorted(list, sort)
         val today = vm.repo.currentDate()
         val brName = vm.branchName.value.ifEmpty { vm.branchKey.value ?: "" }
         val user = vm.user.value ?: ""
@@ -90,8 +99,8 @@ object ReportExporter {
         doc.close()
     }
 
-    fun exportExcel(out: OutputStream, vm: AppViewModel, periodName: String, list: List<PaymentRecord>) {
-        val grouped = groupPayments(list).sortedByDescending { it.latestDate }
+    fun exportExcel(out: OutputStream, vm: AppViewModel, periodName: String, list: List<PaymentRecord>, sort: StatementSort = StatementSort.DATE) {
+        val grouped = sorted(list, sort)
         val today = vm.repo.currentDate()
         val brName = vm.branchName.value.ifEmpty { vm.branchKey.value ?: "" }
         val user = vm.user.value ?: ""
@@ -135,15 +144,24 @@ object ReportExporter {
         out.write(sb.toString().toByteArray(Charsets.UTF_8))
     }
 
-    data class SubGroup(val key: String, var name: String, var meter: String, var total: Double, var latestDate: String)
+    data class SubGroup(
+        val key: String,
+        var name: String,
+        var meter: String,
+        var num: String,
+        var total: Double,
+        var latestDate: String,
+        val ids: MutableList<String> = mutableListOf()
+    )
 
     fun groupPayments(list: List<PaymentRecord>): List<SubGroup> {
         val map = LinkedHashMap<String, SubGroup>()
         for (p in list) {
             val key = p.subscriberId.ifEmpty { p.meterNumber.ifEmpty { p.subscriberName.ifEmpty { "غير معروف" } } }
-            val g = map.getOrPut(key) { SubGroup(key, p.subscriberName, p.meterNumber, 0.0, "") }
+            val g = map.getOrPut(key) { SubGroup(key, p.subscriberName, p.meterNumber, p.subscriberNumber, 0.0, "") }
             g.total += p.amount
             if (p.paymentDate > g.latestDate) g.latestDate = p.paymentDate
+            g.ids.add(p.localId)
         }
         return map.values.toList()
     }
