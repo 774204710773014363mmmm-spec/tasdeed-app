@@ -35,6 +35,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val message = MutableStateFlow<ToastMsg?>(null)
     val darkTheme = MutableStateFlow(store.getBool("theme", false))
     val uiFps = MutableStateFlow(store.getInt("ui_fps", 60))
+    val fontScale = MutableStateFlow(store.getInt("font_scale", 100))
     val nowTick = MutableStateFlow(System.currentTimeMillis())
 
     val subscribers = MutableStateFlow<List<Subscriber>>(emptyList())
@@ -42,6 +43,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     val currentPayments = MutableStateFlow<MutableList<PaymentRecord>>(store.loadPayments())
     val periods = MutableStateFlow<MutableList<Period>>(store.loadPeriods())
+    val myAccountPayments = MutableStateFlow<MutableList<PaymentRecord>>(store.loadMyPayments())
     val pendingPayments = MutableStateFlow<MutableList<PaymentRecord>>(loadPendingList("pending_payments"))
     val pendingFreePayments = MutableStateFlow<MutableList<FreePayment>>(loadPendingList("pending_free_payments"))
     val freePayments = MutableStateFlow<List<FreePayment>>(emptyList())
@@ -101,6 +103,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.putInt("ui_fps", fps)
         uiFps.value = fps
         startFrameTick()
+    }
+
+    fun setFontScale(percent: Int) {
+        store.putInt("font_scale", percent)
+        fontScale.value = percent
     }
 
     private fun startFrameTick() {
@@ -265,6 +272,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         savePendingList("pending_free_payments")
         toast("تم حفظ الدفعة الحرة 💸")
         if (hasNetwork()) syncFreePayments()
+    }
+
+    // ---------- حساباتي (كشف شخصي) ----------
+
+    fun addMyAccountPayment(amount: Double, note: String) {
+        val rec = PaymentRecord(
+            subscriberName = "دفعة",
+            meterNumber = "",
+            amount = amount,
+            note = note,
+            paymentDate = repo.currentDate(),
+            branch = branchKey.value ?: "",
+            branchName = branchName.value,
+            collectorUser = user.value ?: "",
+            createdAt = System.currentTimeMillis(),
+            localId = "my_" + System.currentTimeMillis() + "_" + randomSuffix()
+        )
+        myAccountPayments.value = (myAccountPayments.value + rec).toMutableList()
+        store.saveMyPayments(myAccountPayments.value)
+        toast("✅ تم حفظ الدفعة في حساباتي")
+    }
+
+    fun reloadMyAccount() {
+        myAccountPayments.value = store.loadMyPayments()
     }
 
     fun syncPendingPayments() {
