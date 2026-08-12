@@ -32,6 +32,7 @@ fun SettingsScreen(
     val pendingFree by vm.pendingFreePayments.collectAsState()
     val darkTheme by vm.darkTheme.collectAsState()
     val uiFps by vm.uiFps.collectAsState()
+    val fontScale by vm.fontScale.collectAsState()
     var pendingVisible by remember { mutableStateOf(false) }
 
     Column(modifier = modifier.padding(padding)) {
@@ -62,6 +63,25 @@ fun SettingsScreen(
                                     selected = selected,
                                     onClick = { vm.setUiFps(fps) },
                                     label = { Text("$fps", fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("🔤 حجم الخط", fontWeight = FontWeight.Bold)
+                        Text("مضاعف الحجم: ${fontScale}%", fontSize = 12.sp, color = Color.Gray)
+                        Spacer(Modifier.height(10.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(80, 100, 120, 140, 160).forEach { fs ->
+                                val selected = fontScale == fs
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { vm.setFontScale(fs) },
+                                    label = { Text("$fs%", fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
                                 )
                             }
                         }
