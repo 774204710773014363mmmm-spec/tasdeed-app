@@ -53,20 +53,46 @@ fun StatementScreen(
     vm: AppViewModel,
     name: String,
     idx: Int,
+    kind: String = "archive",
     onBack: () -> Unit
 ) {
     val isCurrent = idx < 0
+    val isMy = kind == "my"
     val currentPayments by vm.currentPayments.collectAsState()
     val periods by vm.periods.collectAsState()
-    val list = if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList()
+    val myCur by vm.myAccountPayments.collectAsState()
+    val myPeriods by vm.myPeriods.collectAsState()
+    val list = if (isMy)
+        (if (isCurrent) myCur else myPeriods.getOrNull(idx)?.payments ?: emptyList())
+    else
+        (if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList())
 
     var sortMode by remember { mutableStateOf(StatementSort.DATE) }
-    val grouped = remember(list, sortMode) {
-        val g = ReportExporter.groupPayments(list)
-        when (sortMode) {
-            StatementSort.NAME -> g.sortedBy { it.name }
-            StatementSort.METER -> g.sortedBy { it.meter.toLongOrNull() ?: Long.MAX_VALUE }
-            StatementSort.DATE -> g.sortedByDescending { it.latestDate }
+    val grouped = remember(list, sortMode, isMy) {
+        if (isMy) {
+            // كل دفعة = صف مستقل (حساباتي ليست بأسماء مشتركين)
+            val rows = list.map { p ->
+                ReportExporter.SubGroup(
+                    key = p.localId,
+                    name = p.note.ifEmpty { "دفعة" },
+                    meter = p.meterNumber.ifEmpty { "" },
+                    num = "",
+                    total = p.amount,
+                    latestDate = p.paymentDate
+                ).apply { ids.add(p.localId) }
+            }
+            when (sortMode) {
+                StatementSort.NAME -> rows.sortedBy { it.name }
+                StatementSort.METER -> rows.sortedBy { it.meter.toLongOrNull() ?: Long.MAX_VALUE }
+                StatementSort.DATE -> rows.sortedByDescending { it.latestDate }
+            }
+        } else {
+            val g = ReportExporter.groupPayments(list)
+            when (sortMode) {
+                StatementSort.NAME -> g.sortedBy { it.name }
+                StatementSort.METER -> g.sortedBy { it.meter.toLongOrNull() ?: Long.MAX_VALUE }
+                StatementSort.DATE -> g.sortedByDescending { it.latestDate }
+            }
         }
     }
     val total = grouped.sumOf { it.total }
@@ -74,7 +100,8 @@ fun StatementScreen(
     val ctx = LocalContext.current
 
     var exporting by remember { mutableStateOf(false) }
-    var menuOpen by remember { mutableStateOf(false) }
+    var dlOpen by remember { mutableStateOf(false) }
+    var shOpen by remember { mutableStateOf(false) }
     var sortOpen by remember { mutableStateOf(false) }
     var editMode by remember { mutableStateOf(false) }
     var editedAmounts by remember { mutableStateOf<MutableMap<String, Double>>(mutableMapOf()) }
@@ -170,10 +197,10 @@ fun StatementScreen(
             },
             actions = {
                 IconButton(onClick = { sortOpen = true }) { Icon(Icons.Filled.Sort, contentDescription = "ترتيب", tint = Color.White) }
-                IconButton(onClick = { menuOpen = true }, enabled = !exporting && grouped.isNotEmpty()) {
+                IconButton(onClick = { dlOpen = true }, enabled = !exporting && grouped.isNotEmpty()) {
                     Icon(Icons.Filled.Download, contentDescription = "تنزيل", tint = Color.White)
                 }
-                IconButton(onClick = { menuOpen = true }, enabled = !exporting && grouped.isNotEmpty()) {
+                IconButton(onClick = { shOpen = true }, enabled = !exporting && grouped.isNotEmpty()) {
                     Icon(Icons.Filled.Share, contentDescription = "مشاركة", tint = Color.White)
                 }
             },
@@ -196,29 +223,37 @@ fun StatementScreen(
             }
         }
 
-        // قائمة سفلية (ModalBottomSheet) لخيارات PDF/Excel
-        if (menuOpen) {
-            ModalBottomSheet(onDismissRequest = { menuOpen = false }) {
+        // قائمة سفلية (ModalBottomSheet) للتنزيل فقط
+        if (dlOpen) {
+            ModalBottomSheet(onDismissRequest = { dlOpen = false }) {
                 Column(Modifier.fillMaxWidth().padding(bottom = 28.dp)) {
-                    Text("📤 $name", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    Text("💾 تنزيل $name", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     ListItem(
                         headlineContent = { Text("📄 تنزيل PDF") },
                         supportingContent = { Text("حفظ في الجوال (اختر المكان)") },
-                        modifier = Modifier.clickable { menuOpen = false; doDownload("pdf") }
+                        modifier = Modifier.clickable { dlOpen = false; doDownload("pdf") }
                     )
                     ListItem(
                         headlineContent = { Text("📊 تنزيل Excel") },
                         supportingContent = { Text("حفظ في الجوال (اختر المكان)") },
-                        modifier = Modifier.clickable { menuOpen = false; doDownload("xls") }
+                        modifier = Modifier.clickable { dlOpen = false; doDownload("xls") }
                     )
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 4.dp))
+                }
+            }
+        }
+
+        // قائمة سفلية (ModalBottomSheet) للمشاركة فقط
+        if (shOpen) {
+            ModalBottomSheet(onDismissRequest = { shOpen = false }) {
+                Column(Modifier.fillMaxWidth().padding(bottom = 28.dp)) {
+                    Text("📤 مشاركة $name", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
                     ListItem(
-                        headlineContent = { Text("📤 مشاركة PDF") },
-                        modifier = Modifier.clickable { menuOpen = false; doShare("pdf") }
+                        headlineContent = { Text("📄 مشاركة PDF") },
+                        modifier = Modifier.clickable { shOpen = false; doShare("pdf") }
                     )
                     ListItem(
-                        headlineContent = { Text("📤 مشاركة Excel") },
-                        modifier = Modifier.clickable { menuOpen = false; doShare("xls") }
+                        headlineContent = { Text("📊 مشاركة Excel") },
+                        modifier = Modifier.clickable { shOpen = false; doShare("xls") }
                     )
                 }
             }
@@ -234,7 +269,7 @@ fun StatementScreen(
                 item {
                     Row(Modifier.fillMaxWidth().background(Green).padding(vertical = 10.dp, horizontal = 8.dp)) {
                         Text("#", Modifier.width(28.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
-                        Text("المشترك", Modifier.weight(1.4f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(if (isMy) "الملاحظة" else "المشترك", Modifier.weight(1.4f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("العداد", Modifier.weight(0.9f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("آخر تاريخ", Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("الإجمالي", Modifier.weight(0.8f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -243,10 +278,10 @@ fun StatementScreen(
                 itemsIndexed(grouped, key = { _, s -> s.key + s.name }) { i, s ->
                     Row(
                         Modifier.fillMaxWidth()
-                            .background(if (i % 2 == 0) Color(0xFFF6F9F7) else Color.White)
+                            .background(if (i % 2 == 0) Color(0xFFF0F7FC) else Color.White)
                             .combinedClickable(
                                 onClick = {},
-                                onLongClick = { editTarget = s }
+                                onLongClick = { if (!isMy) editTarget = s }
                             )
                             .padding(vertical = 10.dp, horizontal = 8.dp)
                     ) {
@@ -261,7 +296,10 @@ fun StatementScreen(
             }
         } else {
             // وضع التعديل الكامل
-            val raw = if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList()
+            val raw = if (isMy)
+                (if (isCurrent) myCur else myPeriods.getOrNull(idx)?.payments ?: emptyList())
+            else
+                (if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList())
             Column(Modifier.fillMaxSize()) {
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                     itemsIndexed(raw, key = { _, p -> p.localId }) { _, p ->
@@ -274,7 +312,7 @@ fun StatementScreen(
                                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, textAlign = TextAlign.Center)
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text(p.subscriberName, modifier = Modifier.weight(1f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(if (isMy) p.note.ifEmpty { "دفعة" } else p.subscriberName, modifier = Modifier.weight(1f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text("📅 ${p.paymentDate}", fontSize = 11.sp, color = Color.Gray)
                         }
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
@@ -306,7 +344,8 @@ fun StatementScreen(
                 OutlinedButton(onClick = { editMode = false }, modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
                 Button(
                     onClick = {
-                        vm.saveEditedPeriod(isCurrent, idx, editedAmounts.keys.toSet(), editedAmounts)
+                        if (isMy) vm.saveEditedMyPeriod(isCurrent, idx, editedAmounts.keys.toSet(), editedAmounts)
+                        else vm.saveEditedPeriod(isCurrent, idx, editedAmounts.keys.toSet(), editedAmounts)
                         editMode = false
                     },
                     modifier = Modifier.weight(1f).height(46.dp),
@@ -326,8 +365,12 @@ fun StatementScreen(
 
     // تعديل دفعة مشترك واحد (ضغطة مطولة)
     editTarget?.let { target ->
-        val raw = if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList()
-        val subPays = raw.filter { it.subscriberId.ifEmpty { it.meterNumber.ifEmpty { it.subscriberName } } == target.key }
+        val raw = if (isMy)
+            (if (isCurrent) myCur else myPeriods.getOrNull(idx)?.payments ?: emptyList())
+        else
+            (if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList())
+        val subPays = if (isMy) raw.filter { it.localId == target.key }
+            else raw.filter { it.subscriberId.ifEmpty { it.meterNumber.ifEmpty { it.subscriberName } } == target.key }
         Dialog(onDismissRequest = { editTarget = null }) {
             Surface(shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.padding(20.dp).heightIn(max = 480.dp)) {
@@ -359,7 +402,8 @@ fun StatementScreen(
                         OutlinedButton(onClick = { editTarget = null }, modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
                         Button(
                             onClick = {
-                                vm.saveEditedPeriod(isCurrent, idx, subEdits.keys.toSet(), subEdits)
+                                if (isMy) vm.saveEditedMyPeriod(isCurrent, idx, subEdits.keys.toSet(), subEdits)
+                                else vm.saveEditedPeriod(isCurrent, idx, subEdits.keys.toSet(), subEdits)
                                 editTarget = null
                             },
                             modifier = Modifier.weight(1f).height(46.dp),
