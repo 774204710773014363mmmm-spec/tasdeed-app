@@ -38,6 +38,7 @@ fun HomeScreen(
     var query by remember { mutableStateOf("") }
     val subscribers by vm.subscribers.collectAsState()
     val locks by vm.locks.collectAsState()
+    val now by vm.nowTick.collectAsState()
     var selected by remember { mutableStateOf<Subscriber?>(null) }
 
     Column(modifier = modifier.padding(padding)) {
@@ -72,7 +73,7 @@ fun HomeScreen(
         } else {
             LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(filtered, key = { it.key }) { sub ->
-                    SubscriberCard(sub, isLocked = (locks[sub.key] ?: 0) > System.currentTimeMillis()) {
+                    SubscriberCard(sub, isLocked = (locks[sub.key] ?: 0) > now) {
                         selected = sub
                     }
                 }
@@ -81,7 +82,7 @@ fun HomeScreen(
     }
 
     selected?.let { sub ->
-        PayDialog(vm, sub, (locks[sub.key] ?: 0L) > System.currentTimeMillis()) { selected = null }
+        PayDialog(vm, sub, (locks[sub.key] ?: 0L) > now) { selected = null }
     }
 }
 
