@@ -32,6 +32,8 @@ fun ArchiveScreen(
     val currentPayments by vm.currentPayments.collectAsState()
     val periods by vm.periods.collectAsState()
     val currentTotal = currentPayments.sumOf { it.amount }
+    val currentSubCount = remember(currentPayments) { ReportExporter.groupPayments(currentPayments).size }
+    val periodSubCounts = remember(periods) { periods.map { ReportExporter.groupPayments(it.payments).size } }
 
     Column(modifier = modifier.padding(padding)) {
         TopBar(vm, "الكشوفات", onRefresh = { vm.syncPendingPayments() })
@@ -40,7 +42,7 @@ fun ArchiveScreen(
                 Card(modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("📋 الكشف الحالي", fontWeight = FontWeight.Bold)
-                        Text("${currentPayments.size} دفعة | ${formatNum(currentTotal)} د.ع", fontSize = 13.sp, color = Color.Gray)
+                        Text("${currentSubCount} مشترك | ${formatNum(currentTotal)} د.ع", fontSize = 13.sp, color = Color.Gray)
                         Spacer(Modifier.height(8.dp))
                         if (currentPayments.isNotEmpty()) {
                             OutlinedButton(
@@ -64,7 +66,7 @@ fun ArchiveScreen(
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("📁 ${p.name}", fontWeight = FontWeight.SemiBold)
-                            Text("${p.payments.size} دفعة | ${formatNum(p.payments.sumOf { it.amount })} د.ع", fontSize = 12.sp, color = Color.Gray)
+                            Text("${periodSubCounts.getOrElse(periods.indexOf(p)) { 0 }} مشترك | ${formatNum(p.payments.sumOf { it.amount })} د.ع", fontSize = 12.sp, color = Color.Gray)
                         }
                         Text("🗓 ${p.createdAt}", fontSize = 11.sp, color = Color.Gray)
                     }
