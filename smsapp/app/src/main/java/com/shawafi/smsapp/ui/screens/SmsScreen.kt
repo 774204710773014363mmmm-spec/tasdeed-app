@@ -33,6 +33,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -85,6 +86,7 @@ private enum class Tab(val label: String) {
     SEND("إرسال"), HISTORY("السجل"), SETTINGS("الإعدادات")
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmsMainScreen(vm: AppViewModel) {
     val context = LocalContext.current
@@ -191,7 +193,9 @@ private fun SendTab(
                 if (SmsPhone.isValid(norm)) {
                     vm.importSmsRows(rows + SmsRow(
                         id = java.util.UUID.randomUUID().toString(),
-                        phone = norm, name = name, status = SmsStatus.PENDING
+                        phone = norm, name = name,
+                        prevReading = 0.0, curReading = 0.0, arrears = 0.0,
+                        status = SmsStatus.PENDING
                     ))
                 } else {
                     vm.toast("رقم الجوال غير صالح: $phone", true)
@@ -362,7 +366,7 @@ private fun HistoryTab(vm: AppViewModel) {
                 Row(Modifier.fillMaxWidth().padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(h.name.ifBlank { h.phone }, fontWeight = FontWeight.Bold)
-                        Text(h.phone + " • " + f.format(Date(h.time)), style = MaterialTheme.typography.bodySmall, color = Color(0xFF616161))
+                        Text(h.phone + " • " + f.format(Date(h.ts)), style = MaterialTheme.typography.bodySmall, color = Color(0xFF616161))
                     }
                     Text(if (h.success) "✅" else "❌", fontSize = 20.sp)
                 }
