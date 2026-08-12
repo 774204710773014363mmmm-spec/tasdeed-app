@@ -11,27 +11,28 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
-val Green = Color(0xFF059669)
-val GreenDark = Color(0xFF047857)
-val GreenLight = Color(0xFF10B981)
-val GreenPale = Color(0xFFD1FAE5)
+// هوية سماوية (Sky Blue) - الألوان الخارجية للتطبيق
+val Green = Color(0xFF0284C7)
+val GreenDark = Color(0xFF0369A1)
+val GreenLight = Color(0xFF38BDF8)
+val GreenPale = Color(0xFFBAE6FD)
 val Amber = Color(0xFFF59E0B)
 val Red = Color(0xFFDC2626)
 val Gray = Color(0xFF98A2B3)
 
-// التدرج الأخضر - هوية التطبيق
-val GreenBrush = Brush.linearGradient(listOf(Color(0xFF34D399), Color(0xFF059669), Color(0xFF047857)))
-val GreenSoftBrush = Brush.linearGradient(listOf(Color(0xFFD1FAE5), Color(0xFFA7F3D0)))
+// التدرج السماوي - هوية التطبيق
+val GreenBrush = Brush.linearGradient(listOf(Color(0xFF7DD3FC), Color(0xFF0284C7), Color(0xFF0369A1)))
+val GreenSoftBrush = Brush.linearGradient(listOf(Color(0xFFE0F2FE), Color(0xFFBAE6FD)))
 
 private val LightColors = lightColorScheme(
     primary = Green,
     onPrimary = Color.White,
     primaryContainer = GreenPale,
-    onPrimaryContainer = Color(0xFF064E3B),
+    onPrimaryContainer = Color(0xFF0C4A6E),
     secondary = GreenLight,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFA7F3D0),
-    onSecondaryContainer = Color(0xFF064E3B),
+    secondaryContainer = Color(0xFFBAE6FD),
+    onSecondaryContainer = Color(0xFF0C4A6E),
     tertiary = Amber,
     onTertiary = Color.White,
     surface = Color(0xFFF8FAFC),
@@ -44,14 +45,14 @@ private val LightColors = lightColorScheme(
 )
 
 private val DarkColors = darkColorScheme(
-    primary = Color(0xFF34D399),
-    onPrimary = Color(0xFF052E22),
-    primaryContainer = Color(0xFF065F46),
-    onPrimaryContainer = Color(0xFFD1FAE5),
+    primary = Color(0xFF38BDF8),
+    onPrimary = Color(0xFF082F49),
+    primaryContainer = Color(0xFF0369A1),
+    onPrimaryContainer = Color(0xFFE0F2FE),
     secondary = GreenLight,
-    onSecondary = Color(0xFF052E22),
-    secondaryContainer = Color(0xFF065F46),
-    onSecondaryContainer = Color(0xFFA7F3D0),
+    onSecondary = Color(0xFF082F49),
+    secondaryContainer = Color(0xFF0369A1),
+    onSecondaryContainer = Color(0xFFBAE6FD),
     tertiary = Amber,
     onTertiary = Color(0xFF1F2937),
     surface = Color(0xFF111827),
