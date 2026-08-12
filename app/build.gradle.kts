@@ -12,7 +12,7 @@ android {
         applicationId = "com.shawafi.tasdeed"
         minSdk = 24
         targetSdk = 35
-        versionCode = 18
+        versionCode = 19
         versionName = "1.0"
     }
 
@@ -49,4 +49,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.json:json:20240303")
+    implementation("org.apache.poi:poi:5.2.5")
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
 }
