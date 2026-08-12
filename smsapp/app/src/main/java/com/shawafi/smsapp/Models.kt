@@ -53,6 +53,7 @@ fun buildSmsMessage(row: SmsRow, s: SmsSettings): String {
     return s.template
         .replace("[رقم]", row.phone)
         .replace("[اسم]", row.name)
+        .replace("[اشتراك]", row.subscriberNo)
         .replace("[ق.سابقة]", fmtSmsNum(row.prevReading))
         .replace("[ق.حالية]", fmtSmsNum(row.curReading))
         .replace("[استهلاك]", fmtSmsNum(row.consumption))
@@ -68,6 +69,7 @@ data class SmsRow(
     val prevReading: Double,
     val curReading: Double,
     val arrears: Double,
+    val subscriberNo: String = "",
     val status: SmsStatus = SmsStatus.PENDING
 ) {
     val consumption: Double get() = curReading - prevReading
@@ -83,6 +85,7 @@ data class SmsRow(
         put("prev", prevReading)
         put("cur", curReading)
         put("arrears", arrears)
+        put("sub_no", subscriberNo)
         put("status", status.name)
     }
 
@@ -94,6 +97,7 @@ data class SmsRow(
             prevReading = o.optDouble("prev", 0.0),
             curReading = o.optDouble("cur", 0.0),
             arrears = o.optDouble("arrears", 0.0),
+            subscriberNo = o.optString("sub_no", ""),
             status = runCatching { SmsStatus.valueOf(o.optString("status", "PENDING")) }.getOrDefault(SmsStatus.PENDING)
         )
     }
