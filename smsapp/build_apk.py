@@ -15,6 +15,7 @@
     - أو ضع التوكن في متغير البيئة  GH_TOKEN
 """
 import base64, io, json, os, re, sys, time, urllib.request, urllib.error, zipfile
+from urllib.parse import quote
 
 OWNER = '774204710773014363mmmm-spec'
 REPO = 'tasdeed-app'
@@ -24,6 +25,12 @@ APK_OUT = os.path.join(ROOT, 'رسائل_نقي.apk')
 WORKFLOW_PATH = '.github/workflows/build-sms.yml'
 ARTIFACT_NAME = 'sms-app-debug'
 SMS_PREFIX = 'smsapp/'
+
+def quote_url(url):
+    """تشفير المسار لحماية الأسماء العربية (بدون لمس الـ query)."""
+    parts = url.split('?', 1)
+    q = quote(parts[0], safe='/:@')
+    return q + ('?' + parts[1] if len(parts) > 1 else '')
 
 def get_token():
     t = os.environ.get('GH_TOKEN')
@@ -40,6 +47,7 @@ def get_token():
 TOKEN = get_token()
 
 def api(method, url, payload=None):
+    url = quote_url(url)
     data = json.dumps(payload).encode() if payload is not None else None
     req = urllib.request.Request(url, data=data, method=method)
     req.add_header('Authorization', 'Bearer ' + TOKEN)
