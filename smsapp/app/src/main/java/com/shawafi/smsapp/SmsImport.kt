@@ -2,8 +2,7 @@ package com.shawafi.smsapp
 
 import android.content.Context
 import android.net.Uri
-import org.xmlpull.v1.XmlPullParser
-import org.xmlpull.v1.XmlPullParserFactory
+import android.util.Xml
 import java.io.InputStream
 import java.util.UUID
 import java.util.zip.ZipInputStream
@@ -139,6 +138,15 @@ object SmsImport {
 
     // ---------- XLSX يدوي (zip + xml) ----------
 
+    private val ROW_RE = Regex("<row\\b[^>]*>(.*?)</row>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
+    private val CELL_TAG_RE = Regex("<c\\b[^>]*>", RegexOption.IGNORE_CASE)
+    private val CELL_REF_RE = Regex("r=\"([A-Z]+)\\d*\"", RegexOption.IGNORE_CASE)
+    private val CELL_TYPE_RE = Regex("t=\"([^\"]*)\"", RegexOption.IGNORE_CASE)
+    private val V_RE = Regex("<v>(.*?)</v>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
+    private val T_RE = Regex("<t>(.*?)</t>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
+    private val SI_RE = Regex("<si>(.*?)</si>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
+    private val SI_T_RE = Regex("<t[^>]*>(.*?)</t>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
+
     private fun readXlsx(bytes: ByteArray): List<List<String>> {
         // تجميع أسماء الجداول أولاً (قد تكون sheet1 أو sheet أو غيرهما)
         val sheetNames = mutableListOf<String>()
@@ -158,104 +166,72 @@ object SmsImport {
     }
 
     private fun parseSheet(bytes: ByteArray, sheetName: String): List<List<String>>? {
-        // مرور واحد: قراءة sharedStrings أثناء السير حتى نصل للجدول المطلوب
-        val shared = mutableListOf<String>()
-        var found = false
-        var rows: MutableList<List<String>>? = null
+        var sharedText: String? = null
+        var sheetText: String? = null
         ZipInputStream(java.io.ByteArrayInputStream(bytes)).use { zin ->
             var e = zin.nextEntry
             while (e != null) {
                 when {
                     e.name == sheetName -> {
-                        rows = readSheet(zin, shared)
-                        found = true
+                        sheetText = zin.readBytes().toString(Charsets.UTF_8)
                         return@use
                     }
-                    e.name == "xl/sharedStrings.xml" -> readSharedStrings(zin, shared)
+                    e.name == "xl/sharedStrings.xml" -> sharedText = zin.readBytes().toString(Charsets.UTF_8)
                     else -> zin.closeEntry()
                 }
                 e = zin.nextEntry
             }
         }
-        if (!found) return null
-        return rows
+        val sheet = sheetText ?: return null
+        val shared = sharedText?.let(::parseSharedText) ?: emptyList()
+        return parseSheetText(sheet, shared)
     }
 
-    private fun newParser(zip: ZipInputStream) = XmlPullParserFactory.newInstance().newPullParser().apply {
-        setInput(zip, "UTF-8")
-    }
-
-    private fun readSharedStrings(zip: ZipInputStream, out: MutableList<String>) {
-        val parser = newParser(zip)
-        var event = parser.eventType
-        var inSi = false
-        var inT = false
-        val cur = StringBuilder()
-        while (event != XmlPullParser.END_DOCUMENT) {
-            when (event) {
-                XmlPullParser.START_TAG -> when (parser.name) {
-                    "si" -> { inSi = true; cur.setLength(0) }
-                    "t" -> inT = true
-                }
-                XmlPullParser.TEXT -> if (inT) cur.append(parser.text)
-                XmlPullParser.END_TAG -> when (parser.name) {
-                    "t" -> inT = false
-                    "si" -> if (inSi) { out.add(cur.toString()); inSi = false }
-                }
-            }
-            event = parser.next()
+    private fun parseSharedText(text: String): List<String> {
+        val out = mutableListOf<String>()
+        for (m in SI_RE.findAll(text)) {
+            val sb = StringBuilder()
+            for (t in SI_T_RE.findAll(m.groupValues[1])) sb.append(t.groupValues[1])
+            out.add(Xml.unescapeXml(sb.toString()))
         }
+        return out
     }
 
-    private fun readSheet(zip: ZipInputStream, shared: List<String>): MutableList<List<String>> {
+    private fun parseSheetText(text: String, shared: List<String>): MutableList<List<String>> {
         val out = mutableListOf<List<String>>()
-        val parser = newParser(zip)
-        var event = parser.eventType
-        var curRow = HashMap<Int, String>()
-        var maxCol = -1
-        var curCol = -1
-        var cellType = ""
-        val cellValue = StringBuilder()
-        var inCell = false
-        var collectText = false
-        while (event != XmlPullParser.END_DOCUMENT) {
-            when (event) {
-                XmlPullParser.START_TAG -> when (parser.name) {
-                    "row" -> { curRow = HashMap(); maxCol = -1 }
-                    "c" -> {
-                        curCol = colRefToIdx(parser.getAttributeValue(null, "r") ?: "")
-                        cellType = parser.getAttributeValue(null, "t") ?: ""
-                        cellValue.setLength(0)
-                        inCell = true
-                    }
-                    "v" -> collectText = true
-                    "t" -> if (inCell) collectText = true
+        for (row in ROW_RE.findAll(text)) {
+            val rowXml = row.groupValues[1]
+            val tags = CELL_TAG_RE.findAll(rowXml).toList()
+            if (tags.isEmpty()) continue
+            val cur = HashMap<Int, String>()
+            var maxCol = -1
+            for (i in tags.indices) {
+                val tag = tags[i].value
+                val ref = CELL_REF_RE.find(tag)?.groupValues?.get(1)
+                if (ref == null) continue
+                val col = colRefToIdx(ref)
+                val start = tags[i].range.last + 1
+                val end = if (i + 1 < tags.size) tags[i + 1].range.first else rowXml.length
+                val inner = rowXml.substring(start, end)
+                val cellType = CELL_TYPE_RE.find(tag)?.groupValues?.get(1) ?: ""
+                val v = V_RE.find(inner)?.groupValues?.get(1)
+                val t = T_RE.find(inner)?.groupValues?.get(1)
+                val raw = when {
+                    cellType == "s" && v != null -> v.toIntOrNull()?.let { shared.getOrNull(it) } ?: ""
+                    v != null -> v
+                    t != null -> t
+                    else -> ""
                 }
-                XmlPullParser.TEXT -> if (collectText && inCell) cellValue.append(parser.text)
-                XmlPullParser.END_TAG -> when (parser.name) {
-                    "c" -> {
-                        if (inCell) {
-                            val raw = cellValue.toString().trim()
-                            val value = when (cellType) {
-                                "s" -> raw.toIntOrNull()?.let { shared.getOrNull(it) } ?: ""
-                                "b" -> if (raw == "1") "TRUE" else "FALSE"
-                                else -> raw
-                            }
-                            if (curCol >= 0 && value.isNotEmpty()) {
-                                curRow[curCol] = value
-                                if (curCol > maxCol) maxCol = curCol
-                            }
-                            inCell = false
-                        }
-                    }
-                    "row" -> if (maxCol >= 0) {
-                        val cells = (0..maxCol).map { curRow[it] ?: "" }
-                        if (cells.any { it.isNotBlank() }) out.add(cells)
-                    }
+                val value = Xml.unescapeXml(raw).trim()
+                if (value.isNotEmpty()) {
+                    cur[col] = value
+                    if (col > maxCol) maxCol = col
                 }
             }
-            collectText = false
-            event = parser.next()
+            if (maxCol >= 0) {
+                val cells = (0..maxCol).map { cur[it] ?: "" }
+                if (cells.any { it.isNotBlank() }) out.add(cells)
+            }
         }
         return out
     }
