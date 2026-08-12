@@ -12,11 +12,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.biometric.BiometricManager
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
 
@@ -33,7 +35,9 @@ fun SettingsScreen(
     val darkTheme by vm.darkTheme.collectAsState()
     val uiFps by vm.uiFps.collectAsState()
     val fontScale by vm.fontScale.collectAsState()
+    val bioEnabled by vm.bioEnabled.collectAsState()
     var pendingVisible by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     Column(modifier = modifier.padding(padding)) {
         TopBar(vm, "الإعدادات")
@@ -84,6 +88,43 @@ fun SettingsScreen(
                                     label = { Text("$fs%", fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
                                 )
                             }
+                        }
+                    }
+                }
+            }
+            item {
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("🔐 بصمة الجوال", fontWeight = FontWeight.Bold)
+                        Text("سجّل الدخول ببصمة جهازك بدل كتابة كلمة المرور", fontSize = 12.sp, color = Color.Gray)
+                        Spacer(Modifier.height(8.dp))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                if (bioEnabled) "✅ مفعّلة" else "غير مفعّلة",
+                                fontSize = 14.sp,
+                                modifier = Modifier.weight(1f),
+                                color = if (bioEnabled) Green else Color.Gray
+                            )
+                            Switch(
+                                checked = bioEnabled,
+                                onCheckedChange = { on ->
+                                    if (on) {
+                                        when (BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
+                                            BiometricManager.BIOMETRIC_SUCCESS -> {
+                                                vm.setBioEnabled(true)
+                                                vm.toast("✅ تم تفعيل الدخول بالبصمة")
+                                            }
+                                            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
+                                                vm.toast("⚠️ لا توجد بصمة مسجلة في الجوال", true)
+                                            else ->
+                                                vm.toast("❌ الجوال لا يدعم البصمة", true)
+                                        }
+                                    } else {
+                                        vm.setBioEnabled(false)
+                                        vm.toast("تم إيقاف الدخول بالبصمة")
+                                    }
+                                }
+                            )
                         }
                     }
                 }
