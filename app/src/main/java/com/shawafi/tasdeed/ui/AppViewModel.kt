@@ -184,6 +184,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     reloadSubscribers()
                     startLocksLoop()
                     if (useNetwork) fetchFreePayments()
+                    if (useNetwork) fetchArchiveFromCloud()
                     toast("مرحباً $username 👋")
                 }
             }
@@ -436,15 +437,71 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- archive ----------
 
+    private fun pushArchiveCloud() {
+        val bk = branchKey.value ?: return
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try { repo.pushArchive(bk, currentPayments.value, periods.value) } catch (e: Exception) {}
+            }
+        }
+    }
+
+    fun fetchArchiveFromCloud() {
+        val bk = branchKey.value ?: return
+        viewModelScope.launch {
+            val res = withContext(Dispatchers.IO) {
+                try { repo.fetchArchive(bk) } catch (e: Exception) { null }
+            } ?: return@launch
+            val (cloudCur, cloudPeriods) = res
+            var changed = false
+            val curIds = currentPayments.value.map { it.localId }.toSet()
+            val extra = cloudCur.filter { it.localId !in curIds }
+            if (extra.isNotEmpty()) {
+                currentPayments.value = (currentPayments.value + extra).toMutableList()
+                changed = true
+            }
+            val lp = periods.value.toMutableList()
+            cloudPeriods.forEach { cp ->
+                val idx = lp.indexOfFirst { it.name == cp.name && it.createdAt == cp.createdAt }
+                if (idx >= 0) {
+                    val ids = lp[idx].payments.map { it.localId }.toSet()
+                    val add = cp.payments.filter { it.localId !in ids }
+                    if (add.isNotEmpty()) {
+                        lp[idx].payments.addAll(add)
+                        changed = true
+                    }
+                } else {
+                    lp.add(cp)
+                    changed = true
+                }
+            }
+            if (changed) {
+                periods.value = lp
+                store.savePayments(currentPayments.value)
+                store.savePeriods(periods.value)
+                withContext(Dispatchers.IO) {
+                    try { repo.pushArchive(bk, currentPayments.value, periods.value) } catch (e: Exception) {}
+                }
+                toast("تم تحديث الكشوفات من السحابة ✅")
+            } else {
+                withContext(Dispatchers.IO) {
+                    try { repo.pushArchive(bk, currentPayments.value, periods.value) } catch (e: Exception) {}
+                }
+            }
+        }
+    }
+
     private fun saveToArchive(record: PaymentRecord, periodIdx: Int?) {
         val idx = record.periodIdx ?: periodIdx
         if (idx != null && idx >= 0 && idx < periods.value.size) {
             periods.value[idx].payments.add(record)
             store.savePeriods(periods.value)
+            pushArchiveCloud()
             return
         }
         currentPayments.value = (currentPayments.value + record).toMutableList()
         store.savePayments(currentPayments.value)
+        pushArchiveCloud()
     }
 
     fun newPeriod(name: String) {
@@ -459,6 +516,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         currentPayments.value = mutableListOf()
         store.savePayments(currentPayments.value)
         store.savePeriods(periods.value)
+        pushArchiveCloud()
         toast("✅ تم فتح كشف جديد: $name")
     }
 
@@ -471,6 +529,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             periods.value[idx].payments.addAll(list)
             store.savePeriods(periods.value)
         }
+        pushArchiveCloud()
     }
 
     fun deletePeriod(idx: Int) {
@@ -479,6 +538,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             list.removeAt(idx)
             periods.value = list
             store.savePeriods(list)
+            pushArchiveCloud()
             toast("تم حذف الكشف")
         }
     }
@@ -489,6 +549,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             list[idx] = list[idx].copy(name = newName.trim())
             periods.value = list
             store.savePeriods(list)
+            pushArchiveCloud()
             toast("✅ تم تعديل الاسم")
         }
     }
