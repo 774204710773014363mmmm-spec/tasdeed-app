@@ -49,6 +49,13 @@ object FirebaseClient {
         client.newCall(req).execute().use { resp -> return resp.isSuccessful }
     }
 
+    fun put(path: String, payload: JSONObject): Boolean {
+        val url = "$DB_URL/$path.json"
+        val req = Request.Builder().url(url)
+            .put(payload.toString().toRequestBody(json)).build()
+        client.newCall(req).execute().use { resp -> return resp.isSuccessful }
+    }
+
     fun delete(path: String): Boolean {
         val url = "$DB_URL/$path.json"
         val req = Request.Builder().url(url).delete().build()
