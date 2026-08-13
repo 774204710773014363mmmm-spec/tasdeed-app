@@ -1,7 +1,14 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+val keystoreProps = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
 }
 
 android {
@@ -12,13 +19,26 @@ android {
         applicationId = "com.shawafi.tasdeed"
         minSdk = 24
         targetSdk = 35
-        versionCode = 27
+        versionCode = 28
         versionName = "1.0"
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("tasdeed")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("tasdeed")
+        }
+    }
+
+    signingConfigs {
+        create("tasdeed") {
+            storeFile = rootProject.file(keystoreProps.getProperty("storeFile", "keystore/tasdeed_app.p12"))
+            storePassword = keystoreProps.getProperty("storePassword", "")
+            keyAlias = keystoreProps.getProperty("keyAlias", "tasdeed")
+            keyPassword = keystoreProps.getProperty("keyPassword", "")
         }
     }
 
