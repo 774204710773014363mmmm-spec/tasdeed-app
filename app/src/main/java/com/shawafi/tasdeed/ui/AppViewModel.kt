@@ -49,9 +49,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val pendingPayments = MutableStateFlow<MutableList<PaymentRecord>>(loadPendingList("pending_payments"))
     val pendingFreePayments = MutableStateFlow<MutableList<FreePayment>>(loadPendingList("pending_free_payments"))
     val freePayments = MutableStateFlow<List<FreePayment>>(emptyList())
+    val isOnline = MutableStateFlow(true)
 
     private var lockJob: Job? = null
     private var frameJob: Job? = null
+    private var netJob: Job? = null
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> loadPendingList(key: String): MutableList<T> {
@@ -93,6 +95,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val savedUser = store.getString("saved_user")
         if (savedUser != null) {
             repo.loadFromCache()
+        }
+        startNetLoop()
+    }
+
+    private fun startNetLoop() {
+        netJob?.cancel()
+        netJob = viewModelScope.launch {
+            while (true) {
+                isOnline.value = hasNetwork()
+                delay(3000)
+            }
         }
     }
 
