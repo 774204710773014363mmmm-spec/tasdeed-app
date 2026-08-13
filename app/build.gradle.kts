@@ -19,8 +19,17 @@ android {
         applicationId = "com.shawafi.tasdeed"
         minSdk = 24
         targetSdk = 35
-        versionCode = 28
+        versionCode = 29
         versionName = "1.0"
+    }
+
+    signingConfigs {
+        create("tasdeed") {
+            storeFile = rootProject.file(keystoreProps.getProperty("storeFile", "keystore/tasdeed_app.p12"))
+            storePassword = keystoreProps.getProperty("storePassword", "")
+            keyAlias = keystoreProps.getProperty("keyAlias", "tasdeed")
+            keyPassword = keystoreProps.getProperty("keyPassword", "")
+        }
     }
 
     buildTypes {
@@ -30,15 +39,6 @@ android {
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("tasdeed")
-        }
-    }
-
-    signingConfigs {
-        create("tasdeed") {
-            storeFile = rootProject.file(keystoreProps.getProperty("storeFile", "keystore/tasdeed_app.p12"))
-            storePassword = keystoreProps.getProperty("storePassword", "")
-            keyAlias = keystoreProps.getProperty("keyAlias", "tasdeed")
-            keyPassword = keystoreProps.getProperty("keyPassword", "")
         }
     }
 
