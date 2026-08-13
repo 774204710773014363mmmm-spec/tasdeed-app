@@ -36,7 +36,8 @@ fun HomeScreen(
     vm: AppViewModel,
     modifier: Modifier = Modifier,
     padding: PaddingValues,
-    onNav: (String) -> Unit
+    onNav: (String) -> Unit,
+    onSettings: () -> Unit = {}
 ) {
     var query by remember { mutableStateOf("") }
     val subscribers by vm.subscribers.collectAsState()
@@ -45,7 +46,7 @@ fun HomeScreen(
     var selected by remember { mutableStateOf<Subscriber?>(null) }
 
     Column(modifier = modifier.padding(padding)) {
-        TopBar(vm, "الفواتير", onRefresh = { vm.reloadSubscribers() })
+        TopBar(vm, "الفواتير", onRefresh = { vm.reloadSubscribers() }, onSettings = onSettings)
 
         // search
         OutlinedTextField(
@@ -69,12 +70,22 @@ fun HomeScreen(
 
         if (query.isBlank()) {
             val dueSum = remember(subscribers) { subscribers.filter { it.displayBalance > 0 }.sumOf { it.displayBalance } }
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            val dueCount = remember(subscribers) { subscribers.count { it.displayBalance > 0 } }
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Green),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                StatCard("👥 المشتركين", subscribers.size.toString(), Modifier.weight(1f))
-                StatCard("💰 إجمالي المطلوب", "${formatNum(dueSum)} د.ع", Modifier.weight(1f))
+                Column(Modifier.padding(16.dp)) {
+                    Text("📊 ملخص الحسابات", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth()) {
+                        SummaryCell("المشتركين", subscribers.size.toString(), Modifier.weight(1f))
+                        SummaryCell("مطلوب منهم", dueCount.toString(), Modifier.weight(1f))
+                        SummaryCell("إجمالي المطلوب", "${formatNum(dueSum)} د.ع", Modifier.weight(1f))
+                    }
+                }
             }
             Spacer(Modifier.height(10.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -101,18 +112,11 @@ fun HomeScreen(
 }
 
 @Composable
-fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(Modifier.padding(vertical = 14.dp, horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, fontSize = 12.sp, color = Color.Gray)
-            Spacer(Modifier.height(4.dp))
-            Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
-        }
+fun SummaryCell(label: String, value: String, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f))
+        Spacer(Modifier.height(4.dp))
+        Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
     }
 }
 
