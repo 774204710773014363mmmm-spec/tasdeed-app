@@ -102,12 +102,14 @@ fun LoginScreen(
             Spacer(Modifier.height(56.dp))
             Box(
                 modifier = Modifier
-                    .size(76.dp)
+                    .size(84.dp)
                     .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.2f)),
+                    .background(
+                        Brush.linearGradient(listOf(Color.White.copy(alpha = 0.4f), Color.White.copy(alpha = 0.12f)))
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Text("⚡", fontSize = 34.sp)
+                Text("⚡", fontSize = 38.sp)
             }
             Spacer(Modifier.height(14.dp))
             Text("تسديد الحطباني", fontSize = 27.sp, fontWeight = FontWeight.Black, color = Color.White)
@@ -116,6 +118,8 @@ fun LoginScreen(
                 fontSize = 13.sp,
                 color = Color.White.copy(alpha = 0.85f)
             )
+            Spacer(Modifier.height(14.dp))
+            OnlinePill(vm.isOnline.collectAsState().value)
             Spacer(Modifier.height(30.dp))
 
             Card(
