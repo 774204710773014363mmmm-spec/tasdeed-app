@@ -42,8 +42,10 @@ fun ArchiveScreen(
     val currentSubCount = remember(currentPayments) { ReportExporter.groupPayments(currentPayments).size }
     val periodSubCounts = remember(periods) { periods.map { ReportExporter.groupPayments(it.payments).size } }
 
+    LaunchedEffect(Unit) { vm.fetchArchiveFromCloud() }
+
     Column(modifier = modifier.padding(padding)) {
-        TopBar(vm, "الكشوفات", onRefresh = { vm.syncPendingPayments() })
+        TopBar(vm, "الكشوفات", onRefresh = { vm.syncPendingPayments(); vm.fetchArchiveFromCloud() })
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
