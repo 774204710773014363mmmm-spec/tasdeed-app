@@ -37,6 +37,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val uiFps = MutableStateFlow(store.getInt("ui_fps", 60))
     val fontScale = MutableStateFlow(store.getInt("font_scale", 100))
     val bioEnabled = MutableStateFlow(store.getBool("bio_enabled"))
+    val devMode = MutableStateFlow(store.getBool("dev_mode", false))
     val nowTick = MutableStateFlow(System.currentTimeMillis())
 
     val subscribers = MutableStateFlow<List<Subscriber>>(emptyList())
@@ -112,6 +113,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setTheme(dark: Boolean) {
         store.putBool("theme", dark)
         darkTheme.value = dark
+    }
+
+    // وضع المطور: تفعيل محلي على الجهاز فقط، لا يُزامن سحابياً
+    fun setDevMode(on: Boolean) {
+        store.putBool("dev_mode", on)
+        devMode.value = on
     }
 
     fun setUiFps(fps: Int) {
