@@ -145,19 +145,22 @@ fun FreeScreen(
                                 icon = Icons.Filled.Share,
                                 label = "مشاركة",
                                 onClick = { shOpen = true },
-                                enabled = myPayments.isNotEmpty() && !exporting
+                                enabled = myPayments.isNotEmpty() && !exporting,
+                                modifier = Modifier.weight(1f)
                             )
                             ActionPill(
                                 icon = Icons.Filled.FileDownload,
                                 label = "تنزيل",
                                 onClick = { dlOpen = true },
-                                enabled = myPayments.isNotEmpty() && !exporting
+                                enabled = myPayments.isNotEmpty() && !exporting,
+                                modifier = Modifier.weight(1f)
                             )
                             ActionPill(
                                 icon = Icons.Filled.AddCircle,
                                 label = "تسجيل دفعة",
                                 onClick = { showAdd = true },
-                                highlight = true
+                                highlight = true,
+                                modifier = Modifier.weight(1f)
                             )
                         }
                         if (myPayments.isNotEmpty()) {
