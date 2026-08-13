@@ -180,6 +180,51 @@ class AppRepository(val store: LocalStore) {
         return out.sortedByDescending { it.createdAt }
     }
 
+    fun fetchArchive(branch: String): Pair<MutableList<PaymentRecord>, MutableList<Period>>? {
+        val o = FirebaseClient.get("${FirebaseClient.ROOT}/archive/$branch") ?: return null
+        val cur = mutableListOf<PaymentRecord>()
+        o.optJSONArray("current")?.let { arr ->
+            for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { cur.add(PaymentRecord.from(it)) }
+        }
+        val ps = mutableListOf<Period>()
+        o.optJSONArray("periods")?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val po = arr.optJSONObject(i) ?: continue
+                val p = Period(
+                    name = po.optString("name"),
+                    createdAt = po.optString("created_at"),
+                    closedAt = po.optLong("closed_at", System.currentTimeMillis())
+                )
+                po.optJSONArray("payments")?.let { pays ->
+                    for (j in 0 until pays.length()) pays.optJSONObject(j)?.let { p.payments.add(PaymentRecord.from(it)) }
+                }
+                ps.add(p)
+            }
+        }
+        return cur to ps
+    }
+
+    fun pushArchive(branch: String, current: List<PaymentRecord>, periodsList: List<Period>): Boolean {
+        val payload = JSONObject()
+        val cur = JSONArray()
+        current.forEach { cur.put(it.toJson()) }
+        payload.put("current", cur)
+        val ps = JSONArray()
+        periodsList.forEach { p ->
+            val o = JSONObject()
+            o.put("name", p.name)
+            o.put("created_at", p.createdAt)
+            o.put("closed_at", p.closedAt)
+            val pays = JSONArray()
+            p.payments.forEach { pays.put(it.toJson()) }
+            o.put("payments", pays)
+            ps.put(o)
+        }
+        payload.put("periods", ps)
+        payload.put("updated_at", System.currentTimeMillis())
+        return FirebaseClient.put("${FirebaseClient.ROOT}/archive/$branch", payload)
+    }
+
     private fun bumpCacheVersion() {
         val payload = JSONObject()
         payload.put("cache_version", System.currentTimeMillis())
