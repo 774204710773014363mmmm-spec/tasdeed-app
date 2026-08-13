@@ -2,8 +2,6 @@ package com.shawafi.smsapp
 
 import android.content.Context
 import android.net.Uri
-import kotlin.text.Regex
-import kotlin.text.RegexOption
 import java.io.InputStream
 import java.util.UUID
 import java.util.zip.ZipInputStream
@@ -139,15 +137,15 @@ object SmsImport {
 
     // ---------- XLSX يدوي (zip + xml) ----------
 
-    private val ROW_RE = Regex("<row\\b[^>]*>(.*?)</row>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
-    private val CELL_TAG_RE = Regex("<c\\b[^>]*>", RegexOption.IGNORE_CASE)
-    private val CELL_REF_RE = Regex("r=\"([A-Z]+)\\d*\"", RegexOption.IGNORE_CASE)
-    private val CELL_TYPE_RE = Regex("t=\"([^\"]*)\"", RegexOption.IGNORE_CASE)
-    private val V_RE = Regex("<v>(.*?)</v>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
-    private val T_RE = Regex("<t>(.*?)</t>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
-    private val SI_RE = Regex("<si>(.*?)</si>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
-    private val SI_T_RE = Regex("<t[^>]*>(.*?)</t>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
-    private val ENTITY_RE = Regex("&#(\\d+);")
+    private val ROW_P = java.util.regex.Pattern.compile("<row\\b[^>]*>(.*?)</row>", java.util.regex.Pattern.DOTALL or java.util.regex.Pattern.CASE_INSENSITIVE)
+    private val CELL_TAG_P = java.util.regex.Pattern.compile("<c\\b[^>]*>", java.util.regex.Pattern.CASE_INSENSITIVE)
+    private val CELL_REF_P = java.util.regex.Pattern.compile("r=\"([A-Z]+)\\d*\"", java.util.regex.Pattern.CASE_INSENSITIVE)
+    private val CELL_TYPE_P = java.util.regex.Pattern.compile("t=\"([^\"]*)\"", java.util.regex.Pattern.CASE_INSENSITIVE)
+    private val V_P = java.util.regex.Pattern.compile("<v>(.*?)</v>", java.util.regex.Pattern.DOTALL or java.util.regex.Pattern.CASE_INSENSITIVE)
+    private val T_P = java.util.regex.Pattern.compile("<t>(.*?)</t>", java.util.regex.Pattern.DOTALL or java.util.regex.Pattern.CASE_INSENSITIVE)
+    private val SI_P = java.util.regex.Pattern.compile("<si>(.*?)</si>", java.util.regex.Pattern.DOTALL or java.util.regex.Pattern.CASE_INSENSITIVE)
+    private val SI_T_P = java.util.regex.Pattern.compile("<t[^>]*>(.*?)</t>", java.util.regex.Pattern.DOTALL or java.util.regex.Pattern.CASE_INSENSITIVE)
+    private val ENTITY_P = java.util.regex.Pattern.compile("&#(\\d+);")
 
     private fun unescapeXml(v: String): String {
         var s = v
@@ -157,8 +155,14 @@ object SmsImport {
             .replace("&quot;", "\"")
             .replace("&apos;", "'")
             .replace("&nbsp;", " ")
-        s = ENTITY_RE.replace(s) { m -> m.groupValues[1].toIntOrNull()?.toChar()?.toString() ?: "?" }
-        return s
+        val m = ENTITY_P.matcher(s)
+        val sb = StringBuilder()
+        while (m.find()) {
+            val ch = m.group(1).toIntOrNull()?.toChar()?.toString() ?: "?"
+            m.appendReplacement(sb, java.util.regex.Matcher.quoteReplacement(ch))
+        }
+        m.appendTail(sb)
+        return sb.toString()
     }
 
     private fun readXlsx(bytes: ByteArray): List<List<String>> {
@@ -203,9 +207,11 @@ object SmsImport {
 
     private fun parseSharedText(text: String): List<String> {
         val out = mutableListOf<String>()
-        for (m in SI_RE.findAll(text)) {
+        val si = SI_P.matcher(text)
+        while (si.find()) {
             val sb = StringBuilder()
-            for (t in SI_T_RE.findAll(m.groupValues[1])) sb.append(t.groupValues[1])
+            val t = SI_T_P.matcher(si.group(1))
+            while (t.find()) sb.append(t.group(1))
             out.add(unescapeXml(sb.toString()))
         }
         return out
@@ -213,23 +219,30 @@ object SmsImport {
 
     private fun parseSheetText(text: String, shared: List<String>): MutableList<List<String>> {
         val out = mutableListOf<List<String>>()
-        for (row in ROW_RE.findAll(text)) {
-            val rowXml = row.groupValues[1]
-            val tags = CELL_TAG_RE.findAll(rowXml).toList()
-            if (tags.isEmpty()) continue
+        val rows = ROW_P.matcher(text)
+        while (rows.find()) {
+            val rowXml = rows.group(1)
+            val tags = CELL_TAG_P.matcher(rowXml)
+            val starts = mutableListOf<Int>()
+            while (tags.find()) starts.add(tags.start())
+            if (starts.isEmpty()) continue
             val cur = HashMap<Int, String>()
             var maxCol = -1
-            for (i in tags.indices) {
-                val tag = tags[i].value
-                val ref = CELL_REF_RE.find(tag)?.groupValues?.get(1)
+            for (i in starts.indices) {
+                val tagMatcher = CELL_TAG_P.matcher(rowXml)
+                if (!tagMatcher.find(starts[i])) continue
+                val tag = tagMatcher.group()
+                val refMatcher = CELL_REF_P.matcher(tag)
+                val ref = if (refMatcher.find()) refMatcher.group(1) else null
                 if (ref == null) continue
                 val col = colRefToIdx(ref)
-                val start = tags[i].range.last + 1
-                val end = if (i + 1 < tags.size) tags[i + 1].range.first else rowXml.length
+                val start = tagMatcher.end()
+                val end = if (i + 1 < starts.size) starts[i + 1] else rowXml.length
                 val inner = rowXml.substring(start, end)
-                val cellType = CELL_TYPE_RE.find(tag)?.groupValues?.get(1) ?: ""
-                val v = V_RE.find(inner)?.groupValues?.get(1)
-                val t = T_RE.find(inner)?.groupValues?.get(1)
+                val cellTypeMatcher = CELL_TYPE_P.matcher(tag)
+                val cellType = if (cellTypeMatcher.find()) cellTypeMatcher.group(1) else ""
+                val v = find1(V_P, inner)
+                val t = find1(T_P, inner)
                 val raw = when {
                     cellType == "s" && v != null -> v.toIntOrNull()?.let { shared.getOrNull(it) } ?: ""
                     v != null -> v
@@ -248,6 +261,11 @@ object SmsImport {
             }
         }
         return out
+    }
+
+    private fun find1(p: java.util.regex.Pattern, s: String): String? {
+        val m = p.matcher(s)
+        return if (m.find()) m.group(1) else null
     }
 
     private fun colRefToIdx(ref: String): Int {
