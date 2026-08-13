@@ -19,6 +19,7 @@ import androidx.fragment.app.FragmentActivity
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.screens.ArchiveScreen
 import com.shawafi.tasdeed.ui.screens.BottomNavBar
+import com.shawafi.tasdeed.ui.screens.CollectorsScreen
 import com.shawafi.tasdeed.ui.screens.FreeScreen
 import com.shawafi.tasdeed.ui.screens.HomeScreen
 import com.shawafi.tasdeed.ui.screens.LoginScreen
@@ -110,6 +111,7 @@ fun MainNav(
         "home" -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onSettings = { onNav("settings") })
         "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement, onSettings = { onNav("settings") })
         "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement, onSettings = { onNav("settings") })
+        "collectors" -> CollectorsScreen(vm, Modifier.fillMaxSize(), padding, onSettings = { onNav("settings") })
         "settings" -> SettingsScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
         else -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onSettings = { onNav("settings") })
     }
