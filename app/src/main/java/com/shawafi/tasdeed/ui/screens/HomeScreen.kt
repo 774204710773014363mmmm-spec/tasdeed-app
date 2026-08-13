@@ -43,6 +43,7 @@ fun HomeScreen(
     val subscribers by vm.subscribers.collectAsState()
     val locks by vm.locks.collectAsState()
     val now by vm.nowTick.collectAsState()
+    val devMode by vm.devMode.collectAsState()
     var selected by remember { mutableStateOf<Subscriber?>(null) }
 
     Column(modifier = modifier.padding(padding)) {
@@ -69,21 +70,23 @@ fun HomeScreen(
         }
 
         if (query.isBlank()) {
-            val dueSum = remember(subscribers) { subscribers.filter { it.displayBalance > 0 }.sumOf { it.displayBalance } }
-            val dueCount = remember(subscribers) { subscribers.count { it.displayBalance > 0 } }
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Green),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("📊 ملخص الحسابات", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth()) {
-                        SummaryCell("المشتركين", subscribers.size.toString(), Modifier.weight(1f))
-                        SummaryCell("مطلوب منهم", dueCount.toString(), Modifier.weight(1f))
-                        SummaryCell("إجمالي المطلوب", "${formatNum(dueSum)} د.ع", Modifier.weight(1f))
+            if (devMode) {
+                val dueSum = remember(subscribers) { subscribers.filter { it.displayBalance > 0 }.sumOf { it.displayBalance } }
+                val dueCount = remember(subscribers) { subscribers.count { it.displayBalance > 0 } }
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = Green),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("📊 ملخص الحسابات", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                        Spacer(Modifier.height(12.dp))
+                        Row(Modifier.fillMaxWidth()) {
+                            SummaryCell("المشتركين", subscribers.size.toString(), Modifier.weight(1f))
+                            SummaryCell("مطلوب منهم", dueCount.toString(), Modifier.weight(1f))
+                            SummaryCell("إجمالي المطلوب", "${formatNum(dueSum)} د.ع", Modifier.weight(1f))
+                        }
                     }
                 }
             }
