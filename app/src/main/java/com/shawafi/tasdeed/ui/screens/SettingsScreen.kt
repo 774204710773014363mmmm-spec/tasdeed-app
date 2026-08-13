@@ -40,10 +40,14 @@ fun SettingsScreen(
     val uiFps by vm.uiFps.collectAsState()
     val fontScale by vm.fontScale.collectAsState()
     val bioEnabled by vm.bioEnabled.collectAsState()
+    val devMode by vm.devMode.collectAsState()
     var pendingVisible by remember { mutableStateOf(false) }
     var smsPassOpen by remember { mutableStateOf(false) }
     var smsPass by remember { mutableStateOf("") }
     var smsPassHidden by remember { mutableStateOf(true) }
+    var devPassOpen by remember { mutableStateOf(false) }
+    var devPass by remember { mutableStateOf("") }
+    var devPassHidden by remember { mutableStateOf(true) }
     val context = LocalContext.current
 
     Column(modifier = modifier.padding(padding)) {
@@ -188,6 +192,27 @@ fun SettingsScreen(
                 }
             }
 
+            // ---------- وضع المطور ----------
+            item { SectionLabel("⚙️ وضع المطور") }
+            item {
+                SettingsGroup {
+                    ToggleRow(
+                        title = "وضع المطور",
+                        subtitle = if (devMode) "🛠️ مفعّل (ملخص الحسابات + كشوفات المحصلين)" else "غير مفعّل",
+                        checked = devMode,
+                        onToggle = { on ->
+                            if (on) {
+                                devPass = ""
+                                devPassOpen = true
+                            } else {
+                                vm.setDevMode(false)
+                                vm.toast("تم إيقاف وضع المطور")
+                            }
+                        }
+                    )
+                }
+            }
+
             // ---------- إضافات ----------
             item { SectionLabel("📨 إضافات") }
             item {
@@ -206,7 +231,57 @@ fun SettingsScreen(
         }
     }
 
-    // نافذة كلمة مرور ميزة SMS (خاطئة ← تُغلق بصمت بدون أي رسالة)
+    // نافذة كلمة مرور وضع المطور (تفعيل محلي على هذا الجهاز فقط)
+    if (devPassOpen) {
+        Dialog(onDismissRequest = { devPassOpen = false; devPass = "" }) {
+            Surface(shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("🔧 أدخل كلمة مرور وضع المطور", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("التفعيل محلي على هذا الجهاز فقط ولا يُزامن مع الأجهزة الأخرى", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(Modifier.height(14.dp))
+                    OutlinedTextField(
+                        value = devPass,
+                        onValueChange = { devPass = it },
+                        label = { Text("كلمة المرور") },
+                        singleLine = true,
+                        visualTransformation = if (devPassHidden) PasswordVisualTransformation() else VisualTransformation.None,
+                        trailingIcon = {
+                            IconButton(onClick = { devPassHidden = !devPassHidden }) {
+                                Icon(
+                                    if (devPassHidden) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                    contentDescription = "إظهار"
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(18.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = { devPassOpen = false; devPass = "" },
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) { Text("إلغاء") }
+                        Button(
+                            onClick = {
+                                devPassOpen = false
+                                if (devPass.trim() == "77352085333") {
+                                    devPass = ""
+                                    vm.setDevMode(true)
+                                    vm.toast("✅ تم تفعيل وضع المطور")
+                                } else {
+                                    devPass = ""
+                                    vm.toast("❌ كلمة المرور غير صحيحة", true)
+                                }
+                            },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Green)
+                        ) { Text("تفعيل") }
+                    }
+                }
+            }
+        }
+    }
     if (smsPassOpen) {
         Dialog(onDismissRequest = { smsPassOpen = false; smsPass = "" }) {
             Surface(shape = RoundedCornerShape(20.dp)) {
