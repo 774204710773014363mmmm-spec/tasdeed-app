@@ -29,7 +29,8 @@ fun ArchiveScreen(
     modifier: Modifier = Modifier,
     padding: PaddingValues,
     onNav: (String) -> Unit,
-    onOpenStatement: (String, Int, String) -> Unit
+    onOpenStatement: (String, Int, String) -> Unit,
+    onSettings: () -> Unit = {}
 ) {
     var showNew by remember { mutableStateOf(false) }
     var menuTarget by remember { mutableStateOf<Int?>(null) }
@@ -45,7 +46,7 @@ fun ArchiveScreen(
     LaunchedEffect(Unit) { vm.fetchArchiveFromCloud() }
 
     Column(modifier = modifier.padding(padding)) {
-        TopBar(vm, "الكشوفات", onRefresh = { vm.syncPendingPayments(); vm.fetchArchiveFromCloud() })
+        TopBar(vm, "الكشوفات", onRefresh = { vm.syncPendingPayments(); vm.fetchArchiveFromCloud() }, onSettings = onSettings)
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
