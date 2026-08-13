@@ -30,15 +30,17 @@ data class NavItem(val id: String, val label: String, val icon: ImageVector, val
 @Composable
 fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
     val pendingCount = vm.pendingPayments.value.size + vm.pendingFreePayments.value.size
+    val devMode by vm.devMode.collectAsState()
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
         tonalElevation = 8.dp
     ) {
-        val items = listOf(
-            NavItem("home", "الفواتير", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong),
-            NavItem("archive", "الكشوفات", Icons.Filled.Archive, Icons.Outlined.Archive),
-            NavItem("free", "حساباتي", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet)
-        )
+        val items = buildList {
+            add(NavItem("home", "الفواتير", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong))
+            if (devMode) add(NavItem("collectors", "كشوفات المحصلين", Icons.Filled.People, Icons.Outlined.People))
+            add(NavItem("archive", "الكشوفات", Icons.Filled.Archive, Icons.Outlined.Archive))
+            add(NavItem("free", "حساباتي", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet))
+        }
         items.forEach { item ->
             val selected = current == item.id
             NavigationBarItem(
