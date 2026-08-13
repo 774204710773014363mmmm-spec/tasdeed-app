@@ -130,7 +130,8 @@ fun ActionPill(
     label: String,
     onClick: () -> Unit,
     enabled: Boolean = true,
-    highlight: Boolean = false
+    highlight: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
     Surface(
         onClick = onClick,
@@ -138,7 +139,7 @@ fun ActionPill(
         shape = RoundedCornerShape(16.dp),
         color = if (highlight) Green else MaterialTheme.colorScheme.surface,
         tonalElevation = if (highlight) 0.dp else 1.dp,
-        modifier = Modifier.weight(1f)
+        modifier = modifier
     ) {
         Column(
             Modifier.padding(vertical = 12.dp),
