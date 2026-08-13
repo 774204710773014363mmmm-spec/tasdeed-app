@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -38,7 +42,8 @@ fun FreeScreen(
     modifier: Modifier = Modifier,
     padding: PaddingValues,
     onNav: (String) -> Unit,
-    onOpenStatement: (String, Int, String) -> Unit
+    onOpenStatement: (String, Int, String) -> Unit,
+    onSettings: () -> Unit = {}
 ) {
     var showAdd by remember { mutableStateOf(false) }
     var showNew by remember { mutableStateOf(false) }
@@ -122,16 +127,41 @@ fun FreeScreen(
     }
 
     Column(modifier = modifier.padding(padding)) {
-        TopBar(vm, "حساباتي", onRefresh = { vm.reloadMyAccount() })
+        TopBar(vm, "حساباتي", onRefresh = { vm.reloadMyAccount() }, onSettings = onSettings)
 
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("💼 الحساب الحالي", fontWeight = FontWeight.Bold)
                         Text("${myPayments.size} دفعة | ${formatNum(total)} د.ع", fontSize = 13.sp, color = Color.Gray)
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(14.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ActionPill(
+                                icon = Icons.Filled.Share,
+                                label = "مشاركة",
+                                onClick = { shOpen = true },
+                                enabled = myPayments.isNotEmpty() && !exporting
+                            )
+                            ActionPill(
+                                icon = Icons.Filled.FileDownload,
+                                label = "تنزيل",
+                                onClick = { dlOpen = true },
+                                enabled = myPayments.isNotEmpty() && !exporting
+                            )
+                            ActionPill(
+                                icon = Icons.Filled.AddCircle,
+                                label = "تسجيل دفعة",
+                                onClick = { showAdd = true },
+                                highlight = true
+                            )
+                        }
                         if (myPayments.isNotEmpty()) {
+                            Spacer(Modifier.height(10.dp))
                             OutlinedButton(
                                 onClick = { onOpenStatement("حساباتي الحالية", -1, "my") },
                                 modifier = Modifier.fillMaxWidth()
@@ -174,24 +204,6 @@ fun FreeScreen(
                 Spacer(Modifier.width(8.dp))
                 Text("🔄 جاري إنشاء الملف...", fontSize = 12.sp, color = Color.Gray)
             }
-        }
-
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(
-                onClick = { shOpen = true },
-                modifier = Modifier.weight(1f).height(48.dp),
-                enabled = myPayments.isNotEmpty() && !exporting
-            ) { Text("📤 مشاركة") }
-            OutlinedButton(
-                onClick = { dlOpen = true },
-                modifier = Modifier.weight(1f).height(48.dp),
-                enabled = myPayments.isNotEmpty() && !exporting
-            ) { Text("💾 تنزيل") }
-            Button(
-                onClick = { showAdd = true },
-                modifier = Modifier.weight(1.1f).height(48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Green)
-            ) { Text("➕ تسجيل دفعة", fontWeight = FontWeight.Bold) }
         }
     }
 
