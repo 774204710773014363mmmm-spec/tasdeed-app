@@ -2,14 +2,21 @@ package com.shawafi.tasdeed.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -18,7 +25,7 @@ import com.shawafi.tasdeed.ui.theme.Green
 import com.shawafi.tasdeed.ui.theme.GreenBrush
 import com.shawafi.tasdeed.ui.theme.Amber
 
-data class NavItem(val id: String, val label: String, val icon: ImageVector)
+data class NavItem(val id: String, val label: String, val icon: ImageVector, val iconOutline: ImageVector)
 
 @Composable
 fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
@@ -28,10 +35,10 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
         tonalElevation = 8.dp
     ) {
         val items = listOf(
-            NavItem("home", "الفواتير", Icons.Filled.ReceiptLong),
-            NavItem("free", "حساباتي", Icons.Filled.AccountBalanceWallet),
-            NavItem("archive", "الكشوفات", Icons.Filled.Archive),
-            NavItem("settings", "الإعدادات", Icons.Filled.Settings)
+            NavItem("home", "الفواتير", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong),
+            NavItem("free", "حساباتي", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
+            NavItem("archive", "الكشوفات", Icons.Filled.Archive, Icons.Outlined.Archive),
+            NavItem("settings", "الإعدادات", Icons.Filled.Settings, Icons.Outlined.Settings)
         )
         items.forEach { item ->
             val selected = current == item.id
@@ -41,10 +48,10 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
                 icon = {
                     if (item.id == "free" && pendingCount > 0) {
                         BadgedBox(badge = { Badge { Text(pendingCount.toString(), fontSize = 10.sp) } }) {
-                            Icon(item.icon, contentDescription = item.label)
+                            Icon(if (selected) item.icon else item.iconOutline, contentDescription = item.label)
                         }
                     } else {
-                        Icon(item.icon, contentDescription = item.label)
+                        Icon(if (selected) item.icon else item.iconOutline, contentDescription = item.label)
                     }
                 },
                 label = {
@@ -66,9 +73,30 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
     }
 }
 
+@Composable
+fun OnlinePill(online: Boolean) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (online) Color(0xFF22C55E).copy(alpha = 0.22f) else Color(0xFFEF4444).copy(alpha = 0.22f))
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.size(9.dp).clip(CircleShape).background(if (online) Color(0xFF22C55E) else Color(0xFFEF4444)))
+        Spacer(Modifier.width(6.dp))
+        Text(
+            if (online) "متصل" else "غير متصل",
+            fontSize = 11.sp,
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TopBar(vm: AppViewModel, title: String, onRefresh: (() -> Unit)? = null) {
+    val online by vm.isOnline.collectAsState()
     TopAppBar(
         modifier = Modifier.background(GreenBrush),
         title = {
@@ -80,6 +108,7 @@ fun TopBar(vm: AppViewModel, title: String, onRefresh: (() -> Unit)? = null) {
             }
         },
         actions = {
+            OnlinePill(online)
             if (onRefresh != null) {
                 IconButton(onClick = onRefresh) { Icon(Icons.Filled.Refresh, contentDescription = "تحديث", tint = Color.White) }
             }
