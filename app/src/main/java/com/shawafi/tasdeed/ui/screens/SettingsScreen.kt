@@ -1,11 +1,11 @@
 package com.shawafi.tasdeed.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -22,7 +22,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.biometric.BiometricManager
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
@@ -49,140 +48,93 @@ fun SettingsScreen(
 
     Column(modifier = modifier.padding(padding)) {
         TopBar(vm, "الإعدادات")
-        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+            // ---------- المظهر ----------
+            item { SectionLabel("🎨 المظهر") }
             item {
-                Card(Modifier.fillMaxWidth().clickable { smsPass = ""; smsPassOpen = true }) {
-                    Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("📨 فواتير SMS", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.weight(1f))
-                        Text("▶", color = Color.Gray, fontSize = 12.sp)
-                    }
+                SettingsGroup {
+                    ToggleRow(
+                        title = "الوضع الداكن",
+                        subtitle = if (darkTheme) "🌙 مفعّل" else "☀️ فاتح",
+                        checked = darkTheme,
+                        onToggle = { vm.setTheme(it) }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    DropdownRow(
+                        title = "حجم الخط",
+                        value = "$fontScale%",
+                        options = listOf("80%", "100%", "120%", "140%", "160%"),
+                        onSelect = { vm.setFontScale(listOf(80, 100, 120, 140, 160)[it]) }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    DropdownRow(
+                        title = "معدل التحديث",
+                        value = "$uiFps فريم/ث",
+                        options = listOf("30 فريم/ث", "60 فريم/ث", "90 فريم/ث", "120 فريم/ث"),
+                        onSelect = { vm.setUiFps(listOf(30, 60, 90, 120)[it]) }
+                    )
                 }
             }
+
+            // ---------- الأمان ----------
+            item { SectionLabel("🔒 الأمان") }
             item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("🎨 المظهر", fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(if (darkTheme) "🌙 الوضع الداكن" else "☀️ الوضع الفاتح", fontSize = 14.sp, modifier = Modifier.weight(1f))
-                            Switch(checked = darkTheme, onCheckedChange = { vm.setTheme(it) })
-                        }
-                    }
-                }
-            }
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("⚡ معدل التحديث (فريمات/ثانية)", fontWeight = FontWeight.Bold)
-                        Text("كلما زاد، كانت الواجهة أكثر سلاسة", fontSize = 12.sp, color = Color.Gray)
-                        Spacer(Modifier.height(10.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(30, 60, 90, 120).forEach { fps ->
-                                val selected = uiFps == fps
-                                FilterChip(
-                                    selected = selected,
-                                    onClick = { vm.setUiFps(fps) },
-                                    label = { Text("$fps", fontSize = 13.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("🔤 حجم الخط", fontWeight = FontWeight.Bold)
-                        Text("مضاعف الحجم: ${fontScale}%", fontSize = 12.sp, color = Color.Gray)
-                        Spacer(Modifier.height(10.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            listOf(80, 100, 120, 140, 160).forEach { fs ->
-                                val selected = fontScale == fs
-                                FilterChip(
-                                    selected = selected,
-                                    onClick = { vm.setFontScale(fs) },
-                                    label = { Text("$fs%", fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal) }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("🔐 بصمة الجوال", fontWeight = FontWeight.Bold)
-                        Text("سجّل الدخول ببصمة جهازك بدل كتابة كلمة المرور", fontSize = 12.sp, color = Color.Gray)
-                        Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                if (bioEnabled) "✅ مفعّلة" else "غير مفعّلة",
-                                fontSize = 14.sp,
-                                modifier = Modifier.weight(1f),
-                                color = if (bioEnabled) Green else Color.Gray
-                            )
-                            Switch(
-                                checked = bioEnabled,
-                                onCheckedChange = { on ->
-                                    if (on) {
-                                        when (BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
-                                            BiometricManager.BIOMETRIC_SUCCESS -> {
-                                                vm.setBioEnabled(true)
-                                                vm.toast("✅ تم تفعيل الدخول بالبصمة")
-                                            }
-                                            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
-                                                vm.toast("⚠️ لا توجد بصمة مسجلة في الجوال", true)
-                                            else ->
-                                                vm.toast("❌ الجوال لا يدعم البصمة", true)
-                                        }
-                                    } else {
-                                        vm.setBioEnabled(false)
-                                        vm.toast("تم إيقاف الدخول بالبصمة")
+                SettingsGroup {
+                    ToggleRow(
+                        title = "الدخول بالبصمة",
+                        subtitle = if (bioEnabled) "✅ مفعّلة" else "غير مفعّلة",
+                        checked = bioEnabled,
+                        onToggle = { on ->
+                            if (on) {
+                                when (BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
+                                    BiometricManager.BIOMETRIC_SUCCESS -> {
+                                        vm.setBioEnabled(true)
+                                        vm.toast("✅ تم تفعيل الدخول بالبصمة")
                                     }
+                                    BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
+                                        vm.toast("⚠️ لا توجد بصمة مسجلة في الجوال", true)
+                                    else ->
+                                        vm.toast("❌ الجوال لا يدعم البصمة", true)
                                 }
-                            )
+                            } else {
+                                vm.setBioEnabled(false)
+                                vm.toast("تم إيقاف الدخول بالبصمة")
+                            }
                         }
-                    }
+                    )
                 }
             }
+
+            // ---------- المزامنة ----------
+            item { SectionLabel("📶 المزامنة") }
             item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("👤 المستخدم", fontWeight = FontWeight.Bold)
-                        Text(vm.user.value ?: "-", fontSize = 14.sp, color = Color.Gray)
-                        Text(vm.branchName.value, fontSize = 14.sp, color = Color.Gray)
-                        Spacer(Modifier.height(10.dp))
+                SettingsGroup {
+                    Column(Modifier.padding(14.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("الدفعات المعلقة", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                Text(
+                                    "مدفوعات: ${pendingPayments.size} | دفعات حرة: ${pendingFree.size}",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray
+                                )
+                            }
+                            TextButton(onClick = { pendingVisible = !pendingVisible }) {
+                                Text(if (pendingVisible) "إخفاء" else "عرض")
+                            }
+                        }
                         Button(
-                            onClick = { vm.logout() },
+                            onClick = { vm.syncPendingPayments(); vm.syncFreePayments() },
                             modifier = Modifier.fillMaxWidth().height(46.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
-                        ) { Text("🚪 تسجيل الخروج") }
+                            colors = ButtonDefaults.buttonColors(containerColor = Green)
+                        ) { Text("🔄 مزامنة الآن", fontWeight = FontWeight.Bold) }
                     }
                 }
             }
-            item {
-                Card(Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(16.dp)) {
-                        Text("⏳ الدفعات المعلقة", fontWeight = FontWeight.Bold)
-                        Text("مدفوعات: ${pendingPayments.size} | دفعات حرة: ${pendingFree.size}", fontSize = 13.sp, color = Color.Gray)
-                        Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            OutlinedButton(
-                                onClick = { vm.syncPendingPayments(); vm.syncFreePayments() },
-                                modifier = Modifier.weight(1f).height(44.dp)
-                            ) { Text("🔄 مزامنة الآن") }
-                            OutlinedButton(
-                                onClick = { pendingVisible = !pendingVisible },
-                                modifier = Modifier.weight(1f).height(44.dp)
-                            ) { Text("📋 عرض") }
-                        }
-                    }
-                }
-            }
-            if (pendingVisible) {
+            if (pendingVisible && (pendingPayments.isNotEmpty() || pendingFree.isNotEmpty())) {
                 item {
-                    Card(Modifier.fillMaxWidth()) {
+                    SettingsGroup {
                         Column(Modifier.padding(12.dp)) {
                             Text("📋 مدفوعات معلقة (${pendingPayments.size})", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             pendingPayments.forEachIndexed { idx, p ->
@@ -196,7 +148,7 @@ fun SettingsScreen(
                                     }
                                 }
                             }
-                            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 4.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), modifier = Modifier.padding(vertical = 4.dp))
                             Text("📋 دفعات حرة معلقة (${pendingFree.size})", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                             pendingFree.forEachIndexed { idx, fp ->
                                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -217,6 +169,40 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            // ---------- الحساب ----------
+            item { SectionLabel("👤 الحساب") }
+            item {
+                SettingsGroup {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("المستخدم", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                        Text(vm.user.value ?: "-", fontSize = 14.sp, color = Color.Gray)
+                        Text(vm.branchName.value, fontSize = 14.sp, color = Color.Gray)
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = { vm.logout() },
+                            modifier = Modifier.fillMaxWidth().height(46.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                        ) { Text("🚪 تسجيل الخروج", fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+
+            // ---------- إضافات ----------
+            item { SectionLabel("📨 إضافات") }
+            item {
+                SettingsGroup {
+                    Column(Modifier.padding(4.dp)) {
+                        ListItem(
+                            headlineContent = { Text("📨 فواتير SMS", fontWeight = FontWeight.SemiBold, fontSize = 14.sp) },
+                            supportingContent = { Text("الدخول إلى قسم إرسال الفواتير", fontSize = 12.sp) },
+                            trailingContent = { Text("▶", color = Color.Gray, fontSize = 12.sp) },
+                            modifier = Modifier.clickable { smsPass = ""; smsPassOpen = true }
+                        )
+                    }
+                }
+            }
+            item { Spacer(Modifier.height(8.dp)) }
         }
     }
 
@@ -263,6 +249,67 @@ fun SettingsScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = Green)
                         ) { Text("دخول") }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SectionLabel(text: String) {
+    Text(text, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(horizontal = 4.dp))
+}
+
+@Composable
+fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(Modifier.padding(vertical = 4.dp), content = content)
+    }
+}
+
+@Composable
+fun ToggleRow(title: String, subtitle: String, checked: Boolean, onToggle: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(subtitle, fontSize = 12.sp, color = Color.Gray)
+        }
+        Switch(checked = checked, onCheckedChange = onToggle)
+    }
+}
+
+@Composable
+fun DropdownRow(title: String, value: String, options: List<String>, onSelect: (Int) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        Box {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier.height(42.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(value, fontSize = 13.sp)
+                Spacer(Modifier.width(6.dp))
+                Text("▾", fontSize = 11.sp, color = Color.Gray)
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEachIndexed { i, opt ->
+                    DropdownMenuItem(
+                        text = { Text(opt, fontSize = 13.sp) },
+                        onClick = { expanded = false; onSelect(i) }
+                    )
                 }
             }
         }
