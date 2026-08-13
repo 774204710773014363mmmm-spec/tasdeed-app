@@ -107,10 +107,10 @@ fun MainNav(
     onOpenStatement: (String, Int, String) -> Unit = { _, _, _ -> }
 ) {
     when (screen) {
-        "home" -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
-        "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement)
-        "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement)
+        "home" -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onSettings = { onNav("settings") })
+        "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement, onSettings = { onNav("settings") })
+        "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement, onSettings = { onNav("settings") })
         "settings" -> SettingsScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
-        else -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
+        else -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onSettings = { onNav("settings") })
     }
 }
