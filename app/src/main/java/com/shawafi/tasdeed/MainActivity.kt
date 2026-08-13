@@ -23,6 +23,7 @@ import com.shawafi.tasdeed.ui.screens.FreeScreen
 import com.shawafi.tasdeed.ui.screens.HomeScreen
 import com.shawafi.tasdeed.ui.screens.LoginScreen
 import com.shawafi.tasdeed.ui.screens.SettingsScreen
+import com.shawafi.tasdeed.ui.screens.SplashScreen
 import com.shawafi.tasdeed.ui.screens.StatementScreen
 import com.shawafi.tasdeed.ui.theme.TasdeedTheme
 import androidx.compose.material3.Scaffold
@@ -54,6 +55,12 @@ class MainActivity : FragmentActivity() {
 
 @Composable
 fun MainApp(vm: AppViewModel = viewModel()) {
+    var showSplash by remember { mutableStateOf(true) }
+    if (showSplash) {
+        SplashScreen(onFinished = { showSplash = false })
+        return
+    }
+
     val loggedIn by vm.isLoggedIn.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     val msg by vm.message.collectAsState()
