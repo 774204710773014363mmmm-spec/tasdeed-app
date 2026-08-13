@@ -69,7 +69,7 @@ fun FreeScreen(
                 try {
                     val os = ctx.contentResolver.openOutputStream(uri)
                     if (os == null) false else {
-                        ReportExporter.exportPdf(os, vm, "حساباتي", myPayments)
+                        ReportExporter.exportPdf(os, vm, "حساباتي", myPayments, isMy = true)
                         os.close(); true
                     }
                 } catch (e: Exception) { false }
@@ -87,7 +87,7 @@ fun FreeScreen(
                 try {
                     val os = ctx.contentResolver.openOutputStream(uri)
                     if (os == null) false else {
-                        ReportExporter.exportExcel(os, vm, "حساباتي", myPayments)
+                        ReportExporter.exportExcel(os, vm, "حساباتي", myPayments, isMy = true)
                         os.close(); true
                     }
                 } catch (e: Exception) { false }
@@ -115,8 +115,8 @@ fun FreeScreen(
                 try {
                     val f = File(ctx.cacheDir, "حساباتي.$ext")
                     val os = java.io.FileOutputStream(f)
-                    if (ext == "pdf") ReportExporter.exportPdf(os, vm, "حساباتي", myPayments)
-                    else ReportExporter.exportExcel(os, vm, "حساباتي", myPayments)
+                    if (ext == "pdf") ReportExporter.exportPdf(os, vm, "حساباتي", myPayments, isMy = true)
+                    else ReportExporter.exportExcel(os, vm, "حساباتي", myPayments, isMy = true)
                     os.close(); f
                 } catch (e: Exception) { null }
             }
