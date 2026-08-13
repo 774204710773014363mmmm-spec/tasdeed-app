@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
@@ -14,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -48,8 +51,10 @@ fun HomeScreen(
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            placeholder = { Text("🔍 ابحث باسم المشترك / رقم العداد...") },
+            placeholder = { Text("ابحث باسم المشترك / رقم العداد...") },
+            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
             singleLine = true,
+            shape = RoundedCornerShape(18.dp),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
@@ -63,7 +68,16 @@ fun HomeScreen(
         }
 
         if (query.isBlank()) {
-            Box(Modifier.fillMaxWidth().padding(vertical = 60.dp), contentAlignment = Alignment.Center) {
+            val dueSum = remember(subscribers) { subscribers.filter { it.displayBalance > 0 }.sumOf { it.displayBalance } }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                StatCard("👥 المشتركين", subscribers.size.toString(), Modifier.weight(1f))
+                StatCard("💰 إجمالي المطلوب", "${formatNum(dueSum)} د.ع", Modifier.weight(1f))
+            }
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text("🔍 ابحث باسم المشترك...", color = Color.Gray)
             }
         } else if (filtered.isEmpty()) {
@@ -87,14 +101,38 @@ fun HomeScreen(
 }
 
 @Composable
+fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(Modifier.padding(vertical = 14.dp, horizontal = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, fontSize = 12.sp, color = Color.Gray)
+            Spacer(Modifier.height(4.dp))
+            Text(value, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+        }
+    }
+}
+
+@Composable
 fun SubscriberCard(sub: Subscriber, isLocked: Boolean, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(if (isLocked) Amber else Green),
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isLocked) Amber
+                        else Brush.linearGradient(listOf(GreenLight, Green))
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text(sub.name.take(2).ifEmpty { "?" }, color = Color.White, fontWeight = FontWeight.Bold)
