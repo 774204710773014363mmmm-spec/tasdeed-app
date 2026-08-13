@@ -278,7 +278,10 @@ fun StatementScreen(
                 itemsIndexed(grouped, key = { _, s -> s.key + s.name }) { i, s ->
                     Row(
                         Modifier.fillMaxWidth()
-                            .background(if (i % 2 == 0) Color(0xFFF0F7FC) else Color.White)
+                            .background(
+                                if (i % 2 == 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                else MaterialTheme.colorScheme.surface
+                            )
                             .combinedClickable(
                                 onClick = {},
                                 onLongClick = { if (!isMy) editTarget = s }
