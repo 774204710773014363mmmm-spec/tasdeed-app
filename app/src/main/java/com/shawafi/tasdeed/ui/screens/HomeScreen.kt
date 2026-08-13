@@ -130,7 +130,7 @@ fun SubscriberCard(sub: Subscriber, isLocked: Boolean, onClick: () -> Unit) {
                     .size(44.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isLocked) Amber
+                        if (isLocked) Brush.linearGradient(listOf(Amber, Amber))
                         else Brush.linearGradient(listOf(GreenLight, Green))
                     ),
                 contentAlignment = Alignment.Center
