@@ -2,7 +2,8 @@ package com.shawafi.smsapp
 
 import android.content.Context
 import android.net.Uri
-import android.util.Xml
+import kotlin.text.Regex
+import kotlin.text.RegexOption
 import java.io.InputStream
 import java.util.UUID
 import java.util.zip.ZipInputStream
@@ -138,14 +139,27 @@ object SmsImport {
 
     // ---------- XLSX يدوي (zip + xml) ----------
 
-    private val ROW_RE = Regex("<row\\b[^>]*>(.*?)</row>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
+    private val ROW_RE = Regex("<row\\b[^>]*>(.*?)</row>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
     private val CELL_TAG_RE = Regex("<c\\b[^>]*>", RegexOption.IGNORE_CASE)
     private val CELL_REF_RE = Regex("r=\"([A-Z]+)\\d*\"", RegexOption.IGNORE_CASE)
     private val CELL_TYPE_RE = Regex("t=\"([^\"]*)\"", RegexOption.IGNORE_CASE)
-    private val V_RE = Regex("<v>(.*?)</v>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
-    private val T_RE = Regex("<t>(.*?)</t>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
-    private val SI_RE = Regex("<si>(.*?)</si>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
-    private val SI_T_RE = Regex("<t[^>]*>(.*?)</t>", RegexOption.DOT_MATCHES_ALL or RegexOption.IGNORE_CASE)
+    private val V_RE = Regex("<v>(.*?)</v>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
+    private val T_RE = Regex("<t>(.*?)</t>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
+    private val SI_RE = Regex("<si>(.*?)</si>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
+    private val SI_T_RE = Regex("<t[^>]*>(.*?)</t>", RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
+    private val ENTITY_RE = Regex("&#(\\d+);")
+
+    private fun unescapeXml(v: String): String {
+        var s = v
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&nbsp;", " ")
+        s = ENTITY_RE.replace(s) { m -> m.groupValues[1].toIntOrNull()?.toChar()?.toString() ?: "?" }
+        return s
+    }
 
     private fun readXlsx(bytes: ByteArray): List<List<String>> {
         // تجميع أسماء الجداول أولاً (قد تكون sheet1 أو sheet أو غيرهما)
@@ -192,7 +206,7 @@ object SmsImport {
         for (m in SI_RE.findAll(text)) {
             val sb = StringBuilder()
             for (t in SI_T_RE.findAll(m.groupValues[1])) sb.append(t.groupValues[1])
-            out.add(Xml.unescapeXml(sb.toString()))
+            out.add(unescapeXml(sb.toString()))
         }
         return out
     }
@@ -222,7 +236,7 @@ object SmsImport {
                     t != null -> t
                     else -> ""
                 }
-                val value = Xml.unescapeXml(raw).trim()
+                val value = unescapeXml(raw).trim()
                 if (value.isNotEmpty()) {
                     cur[col] = value
                     if (col > maxCol) maxCol = col
