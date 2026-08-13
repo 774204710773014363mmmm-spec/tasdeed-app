@@ -36,9 +36,8 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
     ) {
         val items = listOf(
             NavItem("home", "الفواتير", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong),
-            NavItem("free", "حساباتي", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet),
             NavItem("archive", "الكشوفات", Icons.Filled.Archive, Icons.Outlined.Archive),
-            NavItem("settings", "الإعدادات", Icons.Filled.Settings, Icons.Outlined.Settings)
+            NavItem("free", "حساباتي", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet)
         )
         items.forEach { item ->
             val selected = current == item.id
@@ -95,7 +94,7 @@ fun OnlinePill(online: Boolean) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TopBar(vm: AppViewModel, title: String, onRefresh: (() -> Unit)? = null) {
+fun TopBar(vm: AppViewModel, title: String, onRefresh: (() -> Unit)? = null, onSettings: (() -> Unit)? = null) {
     val online by vm.isOnline.collectAsState()
     TopAppBar(
         modifier = Modifier.background(GreenBrush),
@@ -112,6 +111,9 @@ fun TopBar(vm: AppViewModel, title: String, onRefresh: (() -> Unit)? = null) {
             if (onRefresh != null) {
                 IconButton(onClick = onRefresh) { Icon(Icons.Filled.Refresh, contentDescription = "تحديث", tint = Color.White) }
             }
+            if (onSettings != null) {
+                IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, contentDescription = "الإعدادات", tint = Color.White) }
+            }
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor = Color.Transparent,
@@ -119,4 +121,37 @@ fun TopBar(vm: AppViewModel, title: String, onRefresh: (() -> Unit)? = null) {
             actionIconContentColor = Color.White
         )
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ActionPill(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    highlight: Boolean = false
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(16.dp),
+        color = if (highlight) Green else MaterialTheme.colorScheme.surface,
+        tonalElevation = if (highlight) 0.dp else 1.dp,
+        modifier = Modifier.weight(1f)
+    ) {
+        Column(
+            Modifier.padding(vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                icon,
+                contentDescription = label,
+                tint = if (highlight) androidx.compose.ui.graphics.Color.White else Green,
+                modifier = Modifier.size(22.dp)
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = if (highlight) Color.White else MaterialTheme.colorScheme.onSurface)
+        }
+    }
 }
