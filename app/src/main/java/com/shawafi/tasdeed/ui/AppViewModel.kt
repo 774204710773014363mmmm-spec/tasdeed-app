@@ -260,6 +260,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         if (fetched.isNotEmpty() || locks.value.isNotEmpty()) locks.value = fetched
                     } catch (e: Exception) {}
                 }
+                // عند عودة الإنترنت نرفع الدفعات المحفوظة تلقائياً
+                if (hasNetwork() && (pendingPayments.value.isNotEmpty() || pendingFreePayments.value.isNotEmpty())) {
+                    syncPendingPayments()
+                    syncFreePayments()
+                }
                 delay(10000)
             }
         }
@@ -267,15 +272,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun acquireLock(subKey: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            repo.acquireLock(subKey)
-            locks.value = repo.fetchLocks()
+            try {
+                repo.acquireLock(subKey)
+                locks.value = repo.fetchLocks()
+            } catch (e: Exception) {}
         }
     }
 
     fun releaseLock(subKey: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            repo.releaseLock(subKey)
-            locks.value = repo.fetchLocks()
+            try {
+                repo.releaseLock(subKey)
+                locks.value = repo.fetchLocks()
+            } catch (e: Exception) {}
         }
     }
 
@@ -283,7 +292,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- payments ----------
 
-    fun recordPayment(sub: Subscriber, amount: Double, note: String, periodIdx: Int?) {
+    fun recordPayment(sub: Subscriber, amount: Double, note: String, periodIdx: Int) {
+        if (periodIdx !in periods.value.indices) {
+            toast("⚠️ أنشئ كشفاً أولاً من شاشة الكشوفات", true)
+            return
+        }
         val rec = PaymentRecord(
             subscriberId = sub.id.ifEmpty { sub.key },
             subscriberName = sub.name,
@@ -301,9 +314,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
         pendingPayments.value = (pendingPayments.value + rec).toMutableList()
         savePendingList("pending_payments")
-        saveToArchive(rec, periodIdx)
+        saveToArchive(rec)
         // تذكّر آخر كشف سُدّد فيه هذا المشترك (محلياً على هذا الجهاز)
-        val stmtName = if (periodIdx == null) "current" else periods.value.getOrNull(periodIdx)?.name ?: "current"
+        val stmtName = periods.value[periodIdx].name
         store.putString("last_stmt_${sub.key}", stmtName)
         toast("تم تسجيل ${amount} د.ع 💰")
         if (hasNetwork()) syncPendingPayments()
@@ -330,6 +343,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- حساباتي (كشف شخصي) ----------
 
     fun addMyAccountPayment(amount: Double, note: String) {
+        if (myPeriods.value.isEmpty()) {
+            toast("⚠️ أنشئ كشفاً أولاً من شاشة حساباتي", true)
+            return
+        }
         val rec = PaymentRecord(
             subscriberName = "دفعة",
             meterNumber = "",
@@ -342,8 +359,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             createdAt = System.currentTimeMillis(),
             localId = "my_" + System.currentTimeMillis() + "_" + randomSuffix()
         )
-        myAccountPayments.value = (myAccountPayments.value + rec).toMutableList()
-        store.saveMyPayments(myAccountPayments.value)
+        val idx = myPeriods.value.lastIndex
+        myPeriods.value[idx].payments.add(rec)
+        store.saveMyPeriods(myPeriods.value)
         toast("✅ تم حفظ الدفعة في حساباتي")
     }
 
@@ -353,16 +371,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun newMyPeriod(name: String) {
-        val old = myAccountPayments.value
         val p = Period(
             name = name,
-            payments = old.toMutableList(),
+            payments = mutableListOf(),
             createdAt = repo.currentDate(),
             closedAt = System.currentTimeMillis()
         )
         myPeriods.value = (myPeriods.value + p).toMutableList()
-        myAccountPayments.value = mutableListOf()
-        store.saveMyPayments(myAccountPayments.value)
         store.saveMyPeriods(myPeriods.value)
         toast("✅ تم فتح كشف حساباتي جديد: $name")
     }
@@ -387,8 +402,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun saveEditedMyPeriod(isCurrent: Boolean, idx: Int, editedIds: Set<String>, newAmounts: Map<String, Double>) {
-        val list = if (isCurrent) myAccountPayments.value else myPeriods.value.getOrNull(idx)?.payments?.toMutableList() ?: return
+    fun saveEditedMyPeriod(idx: Int, editedIds: Set<String>, newAmounts: Map<String, Double>) {
+        if (idx !in myPeriods.value.indices) return
+        val list = myPeriods.value[idx].payments.toMutableList()
         val newList = mutableListOf<PaymentRecord>()
         list.forEach { pay ->
             if (pay.localId in editedIds) {
@@ -398,35 +414,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 newList.add(pay)
             }
         }
-        if (isCurrent) {
-            myAccountPayments.value = newList.toMutableList()
-            store.saveMyPayments(myAccountPayments.value)
-        } else if (idx in myPeriods.value.indices) {
-            myPeriods.value[idx].payments.clear()
-            myPeriods.value[idx].payments.addAll(newList)
-            store.saveMyPeriods(myPeriods.value)
-        }
+        myPeriods.value[idx].payments.clear()
+        myPeriods.value[idx].payments.addAll(newList)
+        store.saveMyPeriods(myPeriods.value)
         toast("✅ تم حفظ التعديلات")
     }
 
-    fun deletePaymentsFromStatement(isCurrent: Boolean, idx: Int, isMy: Boolean, ids: Set<String>) {
+    fun deletePaymentsFromStatement(idx: Int, isMy: Boolean, ids: Set<String>) {
         if (ids.isEmpty()) return
         if (isMy) {
-            if (isCurrent) {
-                myAccountPayments.value = myAccountPayments.value.filterNot { it.localId in ids }.toMutableList()
-                store.saveMyPayments(myAccountPayments.value)
-            } else if (idx in myPeriods.value.indices) {
+            if (idx in myPeriods.value.indices) {
                 val kept = myPeriods.value[idx].payments.filterNot { it.localId in ids }
                 myPeriods.value[idx].payments.clear()
                 myPeriods.value[idx].payments.addAll(kept)
                 store.saveMyPeriods(myPeriods.value)
             }
         } else {
-            if (isCurrent) {
-                currentPayments.value = currentPayments.value.filterNot { it.localId in ids }.toMutableList()
-                store.savePayments(currentPayments.value)
-                pushArchiveCloud()
-            } else if (idx in periods.value.indices) {
+            if (idx in periods.value.indices) {
                 val kept = periods.value[idx].payments.filterNot { it.localId in ids }
                 periods.value[idx].payments.clear()
                 periods.value[idx].payments.addAll(kept)
@@ -445,7 +449,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val iterator = pending.iterator()
                 while (iterator.hasNext()) {
                     val rec = iterator.next()
-                    if (repo.pushPendingPayment(rec)) iterator.remove()
+                    try {
+                        if (repo.pushPendingPayment(rec)) iterator.remove() else break
+                    } catch (e: Exception) { break }
                 }
             }
             pendingPayments.value = pending
@@ -461,7 +467,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val iterator = pending.iterator()
                 while (iterator.hasNext()) {
                     val rec = iterator.next()
-                    if (repo.pushFreePayment(rec)) iterator.remove()
+                    try {
+                        if (repo.pushFreePayment(rec)) iterator.remove() else break
+                    } catch (e: Exception) { break }
                 }
             }
             pendingFreePayments.value = pending
@@ -501,6 +509,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.IO) {
                 try { repo.pushArchive(bk, currentPayments.value, periods.value) } catch (e: Exception) {}
             }
+        }
+    }
+
+    fun pushArchiveFor(branch: String, current: List<PaymentRecord>, periodsList: List<Period>) {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                try { repo.pushArchive(branch, current, periodsList) } catch (e: Exception) { false }
+            }
+            if (ok) toast("✅ تم الحفظ وسيظهر التعديل عند الجميع")
+            else toast("❌ فشل الرفع للسحابة (تحقق من النت)", true)
         }
     }
 
@@ -549,40 +567,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun saveToArchive(record: PaymentRecord, periodIdx: Int?) {
-        val idx = record.periodIdx ?: periodIdx
-        if (idx != null && idx >= 0 && idx < periods.value.size) {
+    private fun saveToArchive(record: PaymentRecord) {
+        val idx = record.periodIdx
+        if (idx != null && idx in periods.value.indices) {
             periods.value[idx].payments.add(record)
             store.savePeriods(periods.value)
             pushArchiveCloud()
-            return
         }
-        currentPayments.value = (currentPayments.value + record).toMutableList()
-        store.savePayments(currentPayments.value)
-        pushArchiveCloud()
     }
 
     fun newPeriod(name: String) {
-        val old = currentPayments.value
         val p = Period(
             name = name,
-            payments = old.toMutableList(),
+            payments = mutableListOf(),
             createdAt = repo.currentDate(),
             closedAt = System.currentTimeMillis()
         )
         periods.value = (periods.value + p).toMutableList()
-        currentPayments.value = mutableListOf()
-        store.savePayments(currentPayments.value)
         store.savePeriods(periods.value)
         pushArchiveCloud()
         toast("✅ تم فتح كشف جديد: $name")
     }
 
-    fun savePeriodData(isCurrent: Boolean, idx: Int, list: List<PaymentRecord>) {
-        if (isCurrent) {
-            currentPayments.value = list.toMutableList()
-            store.savePayments(currentPayments.value)
-        } else if (idx in periods.value.indices) {
+    fun savePeriodData(idx: Int, list: List<PaymentRecord>) {
+        if (idx in periods.value.indices) {
             periods.value[idx].payments.clear()
             periods.value[idx].payments.addAll(list)
             store.savePeriods(periods.value)
@@ -612,8 +620,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun saveEditedPeriod(isCurrent: Boolean, idx: Int, editedIds: Set<String>, newAmounts: Map<String, Double>) {
-        val list = if (isCurrent) currentPayments.value else periods.value.getOrNull(idx)?.payments?.toMutableList() ?: return
+    fun saveEditedPeriod(idx: Int, editedIds: Set<String>, newAmounts: Map<String, Double>) {
+        if (idx !in periods.value.indices) return
+        val list = periods.value[idx].payments.toMutableList()
         val newList = mutableListOf<PaymentRecord>()
         list.forEach { pay ->
             if (pay.localId in editedIds) {
@@ -623,7 +632,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 newList.add(pay)
             }
         }
-        savePeriodData(isCurrent, idx, newList)
+        savePeriodData(idx, newList)
         toast("✅ تم حفظ التعديلات")
     }
 
