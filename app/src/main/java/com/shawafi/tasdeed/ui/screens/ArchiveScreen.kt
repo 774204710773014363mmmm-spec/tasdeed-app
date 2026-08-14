@@ -37,10 +37,7 @@ fun ArchiveScreen(
     var renameTarget by remember { mutableStateOf<Int?>(null) }
     var infoTarget by remember { mutableStateOf<Int?>(null) }
     var deleteTarget by remember { mutableStateOf<Int?>(null) }
-    val currentPayments by vm.currentPayments.collectAsState()
     val periods by vm.periods.collectAsState()
-    val currentTotal = currentPayments.sumOf { it.amount }
-    val currentSubCount = remember(currentPayments) { ReportExporter.groupPayments(currentPayments).size }
     val periodSubCounts = remember(periods) { periods.map { ReportExporter.groupPayments(it.payments).size } }
 
     LaunchedEffect(Unit) { vm.fetchArchiveFromCloud() }
@@ -49,26 +46,14 @@ fun ArchiveScreen(
         TopBar(vm, "الكشوفات", onRefresh = { vm.syncPendingPayments(); vm.fetchArchiveFromCloud() }, onSettings = onSettings)
         LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("📋 الكشف الحالي", fontWeight = FontWeight.Bold)
-                        Text("${currentSubCount} مشترك | ${formatNum(currentTotal)} د.ع", fontSize = 13.sp, color = Color.Gray)
-                        Spacer(Modifier.height(8.dp))
-                        if (currentPayments.isNotEmpty()) {
-                            OutlinedButton(
-                                onClick = { onOpenStatement("الكشف الحالي", -1, "archive") },
-                                modifier = Modifier.fillMaxWidth()
-                            ) { Text("📄 عرض الكشف") }
-                        }
-                    }
-                }
-            }
-            item {
                 Button(
                     onClick = { showNew = true },
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Green)
                 ) { Text("➕ فتح كشف جديد", fontWeight = FontWeight.Bold) }
+            }
+            if (periods.isEmpty()) {
+                item { Box(Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) { Text("لا توجد كشوفات بعد — أنشئ كشفاً أولاً وستُسجَّل فيه كل الدفعات", color = Color.Gray) } }
             }
             item { Text("📦 الكشوفات المغلقة", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
             items(periods, key = { it.name + it.createdAt }) { p ->
@@ -95,7 +80,7 @@ fun ArchiveScreen(
     if (showNew) {
         NewPeriodDialog(
             title = "➕ فتح كشف جديد",
-            subtitle = "سيتم نقل دفعات الكشف الحالي إلى الكشف الجديد",
+            subtitle = "سيُسجَّل في هذا الكشف كل الدفعات الجديدة حتى تفتح كشفاً آخر",
             buttonText = "فتح",
             onOpen = { vm.newPeriod(it) },
             onDismiss = { showNew = false }
