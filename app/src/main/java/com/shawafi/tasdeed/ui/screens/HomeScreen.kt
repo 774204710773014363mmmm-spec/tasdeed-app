@@ -177,8 +177,17 @@ fun formatNum(v: Double): String {
 fun PayDialog(vm: AppViewModel, sub: Subscriber, locked: Boolean, onDismiss: () -> Unit) {
     var amount by remember { mutableStateOf(if (sub.displayBalance > 0) sub.displayBalance.toString() else "") }
     var note by remember { mutableStateOf("") }
-    var periodIdx by remember { mutableStateOf<Int?>(null) }
     val periods by vm.periods.collectAsState()
+    // آخر كشف سُدّد فيه هذا المشترك على هذا الجهاز (يضل محفوظاً حتى تغييره)
+    val savedStmt = remember(sub.key) { vm.repo.store.getString("last_stmt_${sub.key}") }
+    var periodIdx by remember {
+        mutableStateOf(
+            savedStmt?.let { s ->
+                if (s == "current") null
+                else periods.indexOfFirst { it.name == s }.takeIf { it >= 0 }
+            }
+        )
+    }
     val scope = rememberCoroutineScope()
     val isCurrent = periodIdx == null
 
