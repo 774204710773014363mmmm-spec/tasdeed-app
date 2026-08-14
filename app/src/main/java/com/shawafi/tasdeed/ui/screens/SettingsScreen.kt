@@ -41,6 +41,7 @@ fun SettingsScreen(
     val fontScale by vm.fontScale.collectAsState()
     val bioEnabled by vm.bioEnabled.collectAsState()
     val devMode by vm.devMode.collectAsState()
+    val mergeOps by vm.mergeOps.collectAsState()
     var pendingVisible by remember { mutableStateOf(false) }
     var smsPassOpen by remember { mutableStateOf(false) }
     var smsPass by remember { mutableStateOf("") }
@@ -77,6 +78,16 @@ fun SettingsScreen(
                         value = "$uiFps فريم/ث",
                         options = listOf("30 فريم/ث", "60 فريم/ث", "90 فريم/ث", "120 فريم/ث"),
                         onSelect = { vm.setUiFps(listOf(30, 60, 90, 120)[it]) }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                    ToggleRow(
+                        title = "دمج العمليات",
+                        subtitle = if (mergeOps) "مدفوعات نفس المشترك تُدمج في صف واحد" else "كل عملية تظهر كدفعة مستقلة",
+                        checked = mergeOps,
+                        onToggle = {
+                            vm.setMergeOps(it)
+                            vm.toast(if (it) "✅ سيتم دمج العمليات في الكشوفات والملفات" else "كل عملية ستُطبع وتُشارك منفصلة")
+                        }
                     )
                 }
             }
