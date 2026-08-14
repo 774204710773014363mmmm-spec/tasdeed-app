@@ -185,11 +185,11 @@ fun PayDialog(vm: AppViewModel, sub: Subscriber, locked: Boolean, onDismiss: () 
             savedStmt?.let { s ->
                 if (s == "current") null
                 else periods.indexOfFirst { it.name == s }.takeIf { it >= 0 }
-            }
+            } ?: periods.lastIndex
         )
     }
+    var newName by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
-    val isCurrent = periodIdx == null
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp)) {
@@ -220,19 +220,40 @@ fun PayDialog(vm: AppViewModel, sub: Subscriber, locked: Boolean, onDismiss: () 
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(10.dp))
-                // period selector
+                // اختيار الكشف: إذا لا توجد كشوفات يجب إنشاء كشف أولاً
                 var expanded by remember { mutableStateOf(false) }
-                OutlinedButton(
-                    onClick = { expanded = true },
-                    modifier = Modifier.fillMaxWidth().height(52.dp)
-                ) {
-                    Text(if (isCurrent) "📋 الكشف الحالي" else "📁 ${periods.getOrNull(periodIdx!!)?.name ?: ""}", modifier = Modifier.weight(1f))
-                    Text("▼", color = Color.Gray)
-                }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DropdownMenuItem(text = { Text("📋 الكشف الحالي") }, onClick = { periodIdx = null; expanded = false })
-                    periods.forEachIndexed { i, p ->
-                        DropdownMenuItem(text = { Text("📁 ${p.name}") }, onClick = { periodIdx = i; expanded = false })
+                if (periods.isEmpty()) {
+                    OutlinedTextField(
+                        value = newName,
+                        onValueChange = { newName = it },
+                        label = { Text("📁 اسم الكشف الجديد") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text("⚠️ لا توجد كشوفات بعد — أنشئ كشفاً أولاً لتسجيل الدفعات", fontSize = 12.sp, color = Color(0xFFDC2626))
+                    Spacer(Modifier.height(10.dp))
+                    Button(
+                        onClick = {
+                            if (newName.isBlank()) return@Button
+                            vm.newPeriod(newName.trim())
+                            periodIdx = vm.periods.value.lastIndex
+                        },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Green)
+                    ) { Text("➕ فتح الكشف الجديد", fontWeight = FontWeight.Bold) }
+                } else {
+                    OutlinedButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.fillMaxWidth().height(52.dp)
+                    ) {
+                        Text("📁 ${periods.getOrNull(periodIdx)?.name ?: periods.last().name}", modifier = Modifier.weight(1f))
+                        Text("▼", color = Color.Gray)
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        periods.forEachIndexed { i, p ->
+                            DropdownMenuItem(text = { Text("📁 ${p.name}") }, onClick = { periodIdx = i; expanded = false })
+                        }
                     }
                 }
                 Spacer(Modifier.height(18.dp))
@@ -245,6 +266,10 @@ fun PayDialog(vm: AppViewModel, sub: Subscriber, locked: Boolean, onDismiss: () 
                             val amt = amount.toDoubleOrNull() ?: 0.0
                             if (amt <= 0) {
                                 vm.toast("أدخل مبلغ صحيح", true)
+                                return@Button
+                            }
+                            if (periodIdx !in periods.indices) {
+                                vm.toast("أنشئ كشفاً أولاً", true)
                                 return@Button
                             }
                             if (!locked) {
