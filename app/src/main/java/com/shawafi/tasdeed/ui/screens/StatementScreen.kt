@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
@@ -56,16 +57,13 @@ fun StatementScreen(
     kind: String = "archive",
     onBack: () -> Unit
 ) {
-    val isCurrent = idx < 0
     val isMy = kind == "my"
-    val currentPayments by vm.currentPayments.collectAsState()
     val periods by vm.periods.collectAsState()
-    val myCur by vm.myAccountPayments.collectAsState()
     val myPeriods by vm.myPeriods.collectAsState()
     val list = if (isMy)
-        (if (isCurrent) myCur else myPeriods.getOrNull(idx)?.payments ?: emptyList())
+        (myPeriods.getOrNull(idx)?.payments ?: emptyList())
     else
-        (if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList())
+        (periods.getOrNull(idx)?.payments ?: emptyList())
 
     var sortMode by remember { mutableStateOf(StatementSort.DATE) }
     val mergeOps by vm.mergeOps.collectAsState()
@@ -189,7 +187,7 @@ fun StatementScreen(
             modifier = Modifier.background(GreenBrush),
             title = {
                 Column {
-                    Text(if (isCurrent) "📋 $name" else "📁 $name", fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("📁 $name", fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE))
                     Text("${grouped.size} مشترك | ${formatNum(total)} د.ع | ${sortMode.label}", fontSize = 10.5.sp, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
                 }
             },
@@ -290,7 +288,7 @@ fun StatementScreen(
                             .padding(vertical = 10.dp, horizontal = 8.dp)
                     ) {
                         Text("${i + 1}", Modifier.width(28.dp), fontSize = 12.sp, color = Color.Gray)
-                        Text(s.name.ifEmpty { "-" }, Modifier.weight(1.4f), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(s.name.ifEmpty { "-" }, Modifier.weight(1.4f), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE))
                         Text(s.meter.ifEmpty { "-" }, Modifier.weight(0.9f), fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(s.latestDate, Modifier.weight(1f), fontSize = 11.sp, color = Color.Gray, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(formatNum(s.total), Modifier.weight(0.8f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Green, textAlign = TextAlign.End, maxLines = 1)
@@ -301,9 +299,9 @@ fun StatementScreen(
         } else {
             // وضع التعديل الكامل
             val raw = if (isMy)
-                (if (isCurrent) myCur else myPeriods.getOrNull(idx)?.payments ?: emptyList())
+                (myPeriods.getOrNull(idx)?.payments ?: emptyList())
             else
-                (if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList())
+                (periods.getOrNull(idx)?.payments ?: emptyList())
             Column(Modifier.fillMaxSize()) {
                 LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                     itemsIndexed(raw, key = { _, p -> p.localId }) { _, p ->
@@ -316,7 +314,7 @@ fun StatementScreen(
                                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, textAlign = TextAlign.Center)
                             )
                             Spacer(Modifier.width(10.dp))
-                            Text(if (isMy) p.note.ifEmpty { "دفعة" } else p.subscriberName, modifier = Modifier.weight(1f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(if (isMy) p.note.ifEmpty { "دفعة" } else p.subscriberName, modifier = Modifier.weight(1f).basicMarquee(iterations = Int.MAX_VALUE), fontSize = 13.sp, maxLines = 1)
                             Text("📅 ${p.paymentDate}", fontSize = 11.sp, color = Color.Gray)
                         }
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
@@ -348,8 +346,8 @@ fun StatementScreen(
                 OutlinedButton(onClick = { editMode = false }, modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
                 Button(
                     onClick = {
-                        if (isMy) vm.saveEditedMyPeriod(isCurrent, idx, editedAmounts.keys.toSet(), editedAmounts)
-                        else vm.saveEditedPeriod(isCurrent, idx, editedAmounts.keys.toSet(), editedAmounts)
+                        if (isMy) vm.saveEditedMyPeriod(idx, editedAmounts.keys.toSet(), editedAmounts)
+                        else vm.saveEditedPeriod(idx, editedAmounts.keys.toSet(), editedAmounts)
                         editMode = false
                     },
                     modifier = Modifier.weight(1f).height(46.dp),
@@ -370,9 +368,9 @@ fun StatementScreen(
     // تعديل دفعة مشترك واحد (ضغطة مطولة)
     editTarget?.let { target ->
         val raw = if (isMy)
-            (if (isCurrent) myCur else myPeriods.getOrNull(idx)?.payments ?: emptyList())
+            (myPeriods.getOrNull(idx)?.payments ?: emptyList())
         else
-            (if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList())
+            (periods.getOrNull(idx)?.payments ?: emptyList())
         val subPays = if (isMy || !mergeOps) raw.filter { it.localId == target.key }
             else raw.filter { it.subscriberId.ifEmpty { it.meterNumber.ifEmpty { it.subscriberName } } == target.key }
         Dialog(onDismissRequest = { editTarget = null }) {
@@ -404,7 +402,7 @@ fun StatementScreen(
                     Spacer(Modifier.height(12.dp))
                     Button(
                         onClick = {
-                            vm.deletePaymentsFromStatement(isCurrent, idx, isMy, subPays.map { it.localId }.toSet())
+                            vm.deletePaymentsFromStatement(idx, isMy, subPays.map { it.localId }.toSet())
                             editTarget = null
                         },
                         modifier = Modifier.fillMaxWidth().height(44.dp),
@@ -415,8 +413,8 @@ fun StatementScreen(
                         OutlinedButton(onClick = { editTarget = null }, modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
                         Button(
                             onClick = {
-                                if (isMy) vm.saveEditedMyPeriod(isCurrent, idx, subEdits.keys.toSet(), subEdits)
-                                else vm.saveEditedPeriod(isCurrent, idx, subEdits.keys.toSet(), subEdits)
+                                if (isMy) vm.saveEditedMyPeriod(idx, subEdits.keys.toSet(), subEdits)
+                                else vm.saveEditedPeriod(idx, subEdits.keys.toSet(), subEdits)
                                 editTarget = null
                             },
                             modifier = Modifier.weight(1f).height(46.dp),
