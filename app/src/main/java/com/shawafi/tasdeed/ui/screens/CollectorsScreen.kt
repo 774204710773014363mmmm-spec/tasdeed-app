@@ -51,23 +51,23 @@ fun CollectorsScreen(
     var branchKeys by remember { mutableStateOf<List<String>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
-    var open by remember { mutableStateOf<AdminOpen?>(null) }
+    var openTarget by remember { mutableStateOf<AdminOpen?>(null) }
     val scope = rememberCoroutineScope()
 
     fun load() {
         loading = true
         scope.launch {
-            val res = withContext(Dispatchers.IO) {
-                vm.repo.getBranches().entries.sortedBy { it.value.name }.mapNotNull { (k, b) ->
+            val res: MutableList<Triple<String, List<PaymentRecord>, List<Period>>> = mutableListOf()
+            withContext(Dispatchers.IO) {
+                vm.repo.getBranches().entries.sortedBy { it.value.name }.forEach { (k, b) ->
                     try {
-                        vm.repo.fetchArchive(k)?.let { Triple(b.name, it.first, it.second) }?.let { k to it }
-                    } catch (e: Exception) {
-                        null
-                    }
+                        val arch = vm.repo.fetchArchive(k) ?: return@forEach
+                        res.add(Triple(b.name, arch.first, arch.second))
+                    } catch (e: Exception) {}
                 }
             }
             branchKeys = res.map { it.first }
-            data = res.map { it.second }
+            data = res
             loading = false
             loaded = true
         }
@@ -76,33 +76,34 @@ fun CollectorsScreen(
     LaunchedEffect(Unit) { load() }
 
     Column(modifier = modifier.padding(padding)) {
-        val currentOpen = open
+        val currentOpen = openTarget
         if (currentOpen != null) {
             // عرض كشف محصل: تعديل + تصدير + حفظ يصل للجميع
-            val entry = data.getOrNull(branchKeys.indexOf(currentOpen.branchKey))
-            val list = if (currentOpen.isCurrent)
-                entry?.first ?: emptyList()
+            val entry: Triple<String, List<PaymentRecord>, List<Period>>? = data.getOrNull(branchKeys.indexOf(currentOpen.branchKey))
+            val list: List<PaymentRecord> = if (currentOpen.isCurrent)
+                entry?.first ?: emptyList<PaymentRecord>()
             else
-                entry?.third?.getOrNull(currentOpen.idx)?.payments ?: emptyList()
+                entry?.third?.getOrNull(currentOpen.idx)?.payments ?: emptyList<PaymentRecord>()
             AdminStatementScreen(
                 vm = vm,
                 branchKey = currentOpen.branchKey,
                 title = "${currentOpen.branchName} - ${if (currentOpen.isCurrent) "الكشف الحالي" else entry?.third?.getOrNull(currentOpen.idx)?.name ?: "كشف"}",
                 payments = list,
-                onBack = { open = null },
+                onBack = { openTarget = null },
                 onSave = { saved ->
                     val bi = branchKeys.indexOf(currentOpen.branchKey)
                     if (bi >= 0) {
-                        val cur = entry?.first ?: emptyList()
-                        val pers = entry?.third?.toMutableList() ?: mutableListOf()
-                        val newCur = if (currentOpen.isCurrent) saved else cur
-                        if (!currentOpen.isCurrent && currentOpen.idx in pers.indices) {
-                            pers[currentOpen.idx].payments.clear()
-                            pers[currentOpen.idx].payments.addAll(saved)
+                        val cur: List<PaymentRecord> = entry?.first ?: emptyList<PaymentRecord>()
+                        val pers: List<Period> = entry?.third ?: emptyList<Period>()
+                        val newCur: List<PaymentRecord> = if (currentOpen.isCurrent) saved else cur
+                        val persMut: MutableList<Period> = pers.toMutableList()
+                        if (!currentOpen.isCurrent && currentOpen.idx in persMut.indices) {
+                            persMut[currentOpen.idx].payments.clear()
+                            persMut[currentOpen.idx].payments.addAll(saved)
                         }
-                        val newEntry = Triple(currentOpen.branchName, newCur, pers)
+                        val newEntry: Triple<String, List<PaymentRecord>, List<Period>> = Triple(currentOpen.branchName, newCur, persMut)
                         data = data.toMutableList().also { it[bi] = newEntry }
-                        vm.pushArchiveFor(currentOpen.branchKey, newCur, pers)
+                        vm.pushArchiveFor(currentOpen.branchKey, newCur, persMut)
                         vm.toast("✅ تم حفظ التعديلات على كشف ${currentOpen.branchName}")
                     }
                 }
@@ -173,7 +174,7 @@ fun CollectorsScreen(
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = Green,
-                                                    modifier = Modifier.clickable { open = AdminOpen(bk, name, true, -1) }.padding(horizontal = 6.dp, vertical = 4.dp)
+                                                    modifier = Modifier.clickable { openTarget = AdminOpen(bk, name, true, -1) }.padding(horizontal = 6.dp, vertical = 4.dp)
                                                 )
                                             }
                                         }
@@ -202,7 +203,7 @@ fun CollectorsScreen(
                                                         fontSize = 12.sp,
                                                         fontWeight = FontWeight.Bold,
                                                         color = Green,
-                                                        modifier = Modifier.clickable { open = AdminOpen(bk, name, false, pIdx) }.padding(start = 10.dp, end = 2.dp)
+                                                        modifier = Modifier.clickable { openTarget = AdminOpen(bk, name, false, pIdx) }.padding(start = 10.dp, end = 2.dp)
                                                     )
                                                 }
                                             }
