@@ -65,74 +65,94 @@ object ReportExporter {
 
         val doc = PdfDocument()
         val pageW = 842f
-        val rowH = 34f
-        val headerH = 120f
-        val titleH = 60f
-        val bodyTop = headerH + titleH + 20f
-        val rowsPerPage: Int = (((1123 - bodyTop - 120) / rowH).toInt()).coerceAtLeast(5)
-        var pageCount = 0
-        val pageCountTotal = (rows.size / rowsPerPage) + 1
-        val titlePaint = Paint().apply { color = 0xFF0284C7.toInt(); textSize = 34f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
-        val subPaint = Paint().apply { color = 0xFF333333.toInt(); textSize = 20f; textAlign = Paint.Align.CENTER }
-        val smallPaint = Paint().apply { color = 0xFF666666.toInt(); textSize = 15f; textAlign = Paint.Align.CENTER }
-        val headerText = Paint().apply { color = android.graphics.Color.WHITE; textSize = 15f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
-        val cellPaint = Paint().apply { color = 0xFF111111.toInt(); textSize = 14f; textAlign = Paint.Align.CENTER }
-        val totalPaint = Paint().apply { color = 0xFFD4A843.toInt(); textSize = 26f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
-        val zebra = Paint().apply { color = 0xFFF9F9F9.toInt() }
+        val pageH = 1123f
+        val titlePaint = Paint().apply { color = 0xFF0284C7.toInt(); textSize = 30f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
+        val subPaint = Paint().apply { color = 0xFF333333.toInt(); textSize = 17f; textAlign = Paint.Align.CENTER }
+        val smallPaint = Paint().apply { color = 0xFF666666.toInt(); textSize = 14f; textAlign = Paint.Align.CENTER }
+        val labelPaint = Paint().apply { color = 0xFF0284C7.toInt(); textSize = 20f; isFakeBoldText = true; textAlign = Paint.Align.RIGHT }
+        val valuePaint = Paint().apply { color = 0xFF111111.toInt(); textSize = 19f; textAlign = Paint.Align.RIGHT }
+        val totalPaint = Paint().apply { color = 0xFFD4A843.toInt(); textSize = 30f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
+        val numPaint = Paint().apply { color = 0xFF059669.toInt(); textSize = 34f; isFakeBoldText = true; textAlign = Paint.Align.RIGHT }
 
-        val colW = floatArrayOf(40f, 210f, 105f, 120f, 165f, 122f)
-        val cols = 6
-        var offset = 0
-        while (offset < rows.size) {
-            val page = doc.startPage(PdfDocument.PageInfo.Builder(842, 1123, pageCount + 1).create())
+        rows.forEachIndexed { i, s ->
+            val page = doc.startPage(PdfDocument.PageInfo.Builder(842, 1123, i + 1).create())
             val canvas = page.canvas
-            val chunk = rows.subList(offset, minOf(offset + rowsPerPage, rows.size))
 
-            canvas.drawRect(0f, 0f, pageW, 4f, Paint().apply { color = 0xFF0284C7.toInt() })
-            canvas.drawText("💰 تقرير المدفوعات - $user", pageW / 2f, 60f, titlePaint)
-            canvas.drawText(brName, pageW / 2f, 95f, subPaint)
-            canvas.drawText("التاريخ: $today | عدد المشتركين: ${rows.size}", pageW / 2f, 120f, smallPaint)
-            canvas.drawRect(0f, 130f, pageW, 133f, Paint().apply { color = 0xFF0284C7.toInt() })
+            canvas.drawRect(0f, 0f, pageW, 6f, Paint().apply { color = 0xFF0284C7.toInt() })
+            canvas.drawText("💰 تقرير المدفوعات - $user", pageW / 2f, 55f, titlePaint)
+            canvas.drawText("$brName | $periodName", pageW / 2f, 88f, subPaint)
+            canvas.drawText("التاريخ: $today | عدد الدفعات: ${rows.size}", pageW / 2f, 114f, smallPaint)
+            canvas.drawText("الإجمالي الكلي: ${numFmt.format(total)} د.ع", pageW / 2f, 148f, totalPaint)
+            canvas.drawRect(0f, 165f, pageW, 169f, Paint().apply { color = 0xFF0284C7.toInt() })
 
-            canvas.drawText("الإجمالي: ${numFmt.format(total)} د.ع", pageW / 2f, bodyTop - 10, totalPaint)
+            // بطاقة الرقم الواحد - كل حقل في سطر مستقل مع التفاف النص الطويل
+            val rightX = pageW - 60f
+            val maxW = pageW - 230f
+            var y = 220f
+            canvas.drawText("الرقم ${i + 1} من ${rows.size}", pageW - 60f, y, Paint().apply { color = 0xFF999999.toInt(); textSize = 15f; textAlign = Paint.Align.RIGHT })
 
-            var y = bodyTop
-            val headers = arrayOf("#", "المشترك", "العداد", "آخر تاريخ", "ملاحظة", "الإجمالي")
-            var x = 40f
-            headers.forEachIndexed { i, h ->
-                canvas.drawRect(x, y, x + colW[i], y + rowH, Paint().apply { color = 0xFF0284C7.toInt() })
-                canvas.drawText(h, x + colW[i] / 2f, y + rowH / 2f + 5f, headerText)
-                x += colW[i]
-            }
-            y += rowH
+            y += 55f
+            canvas.drawText("المشترك", rightX, y, labelPaint)
+            y += 34f
+            y = drawWrapped(canvas, valuePaint, s.name.ifEmpty { "-" }, rightX, y, maxW, 30f)
+            y += 20f
+            canvas.drawRect(60f, y - 14f, pageW - 60f, y - 12f, Paint().apply { color = 0xFFE5E7EB.toInt() })
+            y += 28f
 
-            chunk.forEachIndexed { i, s ->
-                val rowPaint = if (i % 2 == 0) zebra else Paint().apply { color = android.graphics.Color.WHITE }
-                x = 40f
-                canvas.drawRect(x, y, pageW - 40f, y + rowH, rowPaint)
-                val vals = arrayOf(
-                    (offset + i + 1).toString(),
-                    s.name.ifEmpty { "-" },
-                    s.meter.ifEmpty { "-" },
-                    s.latestDate,
-                    s.note.ifEmpty { "-" },
-                    numFmt.format(s.total) + " د.ع"
-                )
-                for (j in 0 until cols) {
-                    canvas.drawText(vals[j], x + colW[j] / 2f, y + rowH / 2f + 5f, cellPaint)
-                    x += colW[j]
-                }
-                y += rowH
-            }
-            canvas.drawRect(40f, y, pageW - 40f, y + 2f, Paint().apply { color = 0xFFDDDDDD.toInt() })
-            canvas.drawText("صفحة ${pageCount + 1} / $pageCountTotal", pageW / 2f, 1090f, smallPaint)
+            canvas.drawText("رقم العداد", rightX, y, labelPaint)
+            y += 34f
+            y = drawWrapped(canvas, valuePaint, s.meter.ifEmpty { "-" }, rightX, y, maxW, 30f)
+            y += 20f
+            canvas.drawRect(60f, y - 14f, pageW - 60f, y - 12f, Paint().apply { color = 0xFFE5E7EB.toInt() })
+            y += 28f
+
+            canvas.drawText("آخر تاريخ", rightX, y, labelPaint)
+            y += 34f
+            y = drawWrapped(canvas, valuePaint, s.latestDate.ifEmpty { "-" }, rightX, y, maxW, 30f)
+            y += 20f
+            canvas.drawRect(60f, y - 14f, pageW - 60f, y - 12f, Paint().apply { color = 0xFFE5E7EB.toInt() })
+            y += 28f
+
+            canvas.drawText("الملاحظة", rightX, y, labelPaint)
+            y += 34f
+            y = drawWrapped(canvas, valuePaint, s.note.ifEmpty { "-" }, rightX, y, maxW, 30f)
+            y += 20f
+            canvas.drawRect(60f, y - 14f, pageW - 60f, y - 12f, Paint().apply { color = 0xFFE5E7EB.toInt() })
+            y += 40f
+
+            canvas.drawText("المبلغ:", rightX, y, labelPaint)
+            canvas.drawText("${numFmt.format(s.total)} د.ع", rightX, y + 52f, numPaint)
+
+            canvas.drawText("صفحة ${i + 1} / ${rows.size}", pageW / 2f, pageH - 40f, smallPaint)
             doc.finishPage(page)
-            pageCount++
-            offset += rowsPerPage
         }
 
         doc.writeTo(out)
         doc.close()
+    }
+
+    // يرسم النص ملتفاً بعدة أسطر على يمين الصفحة ويرجع إحداثي السطر التالي
+    private fun drawWrapped(
+        canvas: android.graphics.Canvas,
+        paint: Paint,
+        text: String,
+        rightX: Float,
+        startY: Float,
+        maxWidth: Float,
+        lineHeight: Float
+    ): Float {
+        if (text.isEmpty()) return startY + lineHeight
+        var y = startY
+        var remain = text
+        while (remain.isNotEmpty()) {
+            val measured = FloatArray(1)
+            val n = paint.breakText(remain, true, maxWidth, measured)
+            if (n <= 0) break
+            canvas.drawText(remain.substring(0, n), rightX, y, paint)
+            y += (lineHeight + 6f)
+            remain = remain.substring(n)
+        }
+        return y
     }
 
     fun exportExcel(
@@ -159,25 +179,31 @@ object ReportExporter {
         sb.append("<ss:Style ss:ID=\"date\"><ss:Font ss:Size=\"10\" ss:Color=\"#98A2B3\"/></ss:Style>\n")
         sb.append("<ss:Style ss:ID=\"head\"><ss:Font ss:Bold=\"1\" ss:Color=\"#FFFFFF\"/><ss:Interior ss:Color=\"#059669\" ss:Pattern=\"Solid\"/></ss:Style>\n")
         sb.append("<ss:Style ss:ID=\"total\"><ss:Font ss:Bold=\"1\" ss:Size=\"18\" ss:Color=\"#D4A843\"/></ss:Style>\n")
+        sb.append("<ss:Style ss:ID=\"wrapName\"><ss:Alignment ss:WrapText=\"1\"/><ss:Font ss:Size=\"11\"/></ss:Style>\n")
+        sb.append("<ss:Style ss:ID=\"wrapNote\"><ss:Alignment ss:WrapText=\"1\"/><ss:Font ss:Size=\"10\" ss:Color=\"#444444\"/></ss:Style>\n")
         sb.append("</ss:Styles>\n")
         sb.append("<ss:Worksheet ss:Name=\"المدفوعات\">\n")
         sb.append("<ss:Table>\n")
         sb.append("<ss:Column ss:Width=\"8\"/><ss:Column ss:Width=\"28\"/><ss:Column ss:Width=\"15\"/><ss:Column ss:Width=\"18\"/><ss:Column ss:Width=\"25\"/><ss:Column ss:Width=\"18\"/>\n")
         sb.append("<ss:Row ss:Height=\"30\"><ss:Cell ss:MergeAcross=\"5\" ss:StyleID=\"title\"><ss:Data ss:Type=\"String\">💰 تقرير المدفوعات</ss:Data></ss:Cell></ss:Row>\n")
         sb.append("<ss:Row ss:Height=\"20\"><ss:Cell ss:MergeAcross=\"5\" ss:StyleID=\"sub\"><ss:Data ss:Type=\"String\">$brName | $user</ss:Data></ss:Cell></ss:Row>\n")
-        sb.append("<ss:Row ss:Height=\"16\"><ss:Cell ss:MergeAcross=\"5\" ss:StyleID=\"date\"><ss:Data ss:Type=\"String\">$today | عدد المشتركين: ${rows.size}</ss:Data></ss:Cell></ss:Row>\n")
+        sb.append("<ss:Row ss:Height=\"16\"><ss:Cell ss:MergeAcross=\"5\" ss:StyleID=\"date\"><ss:Data ss:Type=\"String\">$today | عدد الدفعات: ${rows.size}</ss:Data></ss:Cell></ss:Row>\n")
         sb.append("<ss:Row ss:Height=\"24\">")
         for (h in arrayOf("#", "اسم المشترك", "رقم العداد", "آخر تاريخ", "ملاحظة", "الإجمالي")) {
             sb.append("<ss:Cell ss:StyleID=\"head\"><ss:Data ss:Type=\"String\">$h</ss:Data></ss:Cell>")
         }
         sb.append("</ss:Row>\n")
         rows.forEachIndexed { i, s ->
-            sb.append("<ss:Row>")
+            // كل رقم في صف مستقل مع خلايا ملفوفة وارتفاع صف يناسب عدد الأسطر
+            val nameLines = estLines(s.name, 14)
+            val noteLines = estLines(s.note, 12)
+            val rowHeight = (maxOf(nameLines, noteLines, 1) * 16 + 6).coerceAtLeast(20)
+            sb.append("<ss:Row ss:Height=\"$rowHeight\">")
             sb.append("<ss:Cell><ss:Data ss:Type=\"Number\">${i + 1}</ss:Data></ss:Cell>")
-            sb.append("<ss:Cell><ss:Data ss:Type=\"String\">${escXml(s.name.ifEmpty { "-" })}</ss:Data></ss:Cell>")
+            sb.append("<ss:Cell ss:StyleID=\"wrapName\"><ss:Data ss:Type=\"String\">${escXml(s.name.ifEmpty { "-" })}</ss:Data></ss:Cell>")
             sb.append("<ss:Cell><ss:Data ss:Type=\"String\">${escXml(s.meter.ifEmpty { "-" })}</ss:Data></ss:Cell>")
             sb.append("<ss:Cell><ss:Data ss:Type=\"String\">${s.latestDate}</ss:Data></ss:Cell>")
-            sb.append("<ss:Cell><ss:Data ss:Type=\"String\">${escXml(s.note.ifEmpty { "-" })}</ss:Data></ss:Cell>")
+            sb.append("<ss:Cell ss:StyleID=\"wrapNote\"><ss:Data ss:Type=\"String\">${escXml(s.note.ifEmpty { "-" })}</ss:Data></ss:Cell>")
             sb.append("<ss:Cell><ss:Data ss:Type=\"Number\">${s.total}</ss:Data></ss:Cell>")
             sb.append("</ss:Row>\n")
         }
@@ -216,4 +242,11 @@ object ReportExporter {
     private fun escXml(s: String): String = s
         .replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
         .replace("\"", "&quot;").replace("'", "&apos;")
+
+    // تقدير عدد الأسطر اللازمة لسلسلة عربية داخل عمود بعرض معين (بالأحرف)
+    private fun estLines(text: String, colChars: Int): Int {
+        if (text.isEmpty()) return 1
+        val charsPerLine = (colChars / 2).coerceAtLeast(4)
+        return ((text.length + charsPerLine - 1) / charsPerLine).coerceAtLeast(1)
+    }
 }
