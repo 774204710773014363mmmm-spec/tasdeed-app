@@ -260,7 +260,7 @@ fun AdminStatementScreen(
                             .padding(vertical = 10.dp, horizontal = 8.dp)
                     ) {
                         Text("${i + 1}", Modifier.width(28.dp), fontSize = 12.sp, color = Color.Gray)
-                        Text(s.name.ifEmpty { "-" }, Modifier.weight(1.4f), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE))
+                        Text(s.name.ifEmpty { "-" }, Modifier.weight(1.4f).basicMarquee(iterations = Int.MAX_VALUE), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Text(s.meter.ifEmpty { "-" }, Modifier.weight(0.9f), fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         Text(s.latestDate, Modifier.weight(1f), fontSize = 11.sp, color = Color.Gray, textAlign = TextAlign.Center, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         Text(formatNum(s.total), Modifier.weight(0.8f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Green, textAlign = TextAlign.End, maxLines = 1)
