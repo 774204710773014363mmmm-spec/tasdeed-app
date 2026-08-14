@@ -99,7 +99,16 @@ class AppRepository(val store: LocalStore) {
     }
 
     fun fetchSubscribers(): MutableMap<String, Subscriber> {
-        val root = FirebaseClient.get("${FirebaseClient.ROOT}/subscribers") ?: return subscribersCache
+        val raw = FirebaseClient.getRaw("${FirebaseClient.ROOT}/subscribers") ?: return subscribersCache
+        // العقدة فارغة أو محذوفة من السحابة → المشتركون صفر، امسح المخبأ القديم
+        if (raw.isEmpty() || raw == "null" || raw == "{}") {
+            if (subscribersCache.isNotEmpty()) {
+                subscribersCache = mutableMapOf()
+                saveLocalSubscribers(subscribersCache)
+            }
+            return subscribersCache
+        }
+        val root = try { JSONObject(raw) } catch (e: Exception) { return subscribersCache }
         val map = mutableMapOf<String, Subscriber>()
         root.keys().forEach { k ->
             root.optJSONObject(k)?.let { Subscriber.from(k, it) }?.let { map[k] = it }
