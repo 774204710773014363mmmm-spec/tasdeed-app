@@ -81,7 +81,7 @@ fun CollectorsScreen(
             // عرض كشف محصل: تعديل + تصدير + حفظ يصل للجميع
             val entry: Triple<String, List<PaymentRecord>, List<Period>>? = data.getOrNull(branchKeys.indexOf(currentOpen.branchKey))
             val list: List<PaymentRecord> = if (currentOpen.isCurrent)
-                entry?.first ?: emptyList<PaymentRecord>()
+                entry?.second ?: emptyList<PaymentRecord>()
             else
                 entry?.third?.getOrNull(currentOpen.idx)?.payments ?: emptyList<PaymentRecord>()
             AdminStatementScreen(
@@ -93,7 +93,7 @@ fun CollectorsScreen(
                 onSave = { saved ->
                     val bi = branchKeys.indexOf(currentOpen.branchKey)
                     if (bi >= 0) {
-                        val cur: List<PaymentRecord> = entry?.first ?: emptyList<PaymentRecord>()
+                        val cur: List<PaymentRecord> = entry?.second ?: emptyList<PaymentRecord>()
                         val pers: List<Period> = entry?.third ?: emptyList<Period>()
                         val newCur: List<PaymentRecord> = if (currentOpen.isCurrent) saved else cur
                         val persMut: MutableList<Period> = pers.toMutableList()
