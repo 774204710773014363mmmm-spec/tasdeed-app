@@ -37,6 +37,9 @@ private fun fmtClosed(ms: Long): String = try {
     ""
 }
 
+// كشف مفتوح من كشوفات المحصلين للتعديل
+private class AdminOpen(val branchKey: String, val branchName: String, val isCurrent: Boolean, val idx: Int)
+
 @Composable
 fun CollectorsScreen(
     vm: AppViewModel,
@@ -45,8 +48,10 @@ fun CollectorsScreen(
     onSettings: () -> Unit = {}
 ) {
     var data by remember { mutableStateOf<List<Triple<String, List<PaymentRecord>, List<Period>>>>(emptyList()) }
+    var branchKeys by remember { mutableStateOf<List<String>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
+    var open by remember { mutableStateOf<AdminOpen?>(null) }
     val scope = rememberCoroutineScope()
 
     fun load() {
@@ -55,13 +60,14 @@ fun CollectorsScreen(
             val res = withContext(Dispatchers.IO) {
                 vm.repo.getBranches().entries.sortedBy { it.value.name }.mapNotNull { (k, b) ->
                     try {
-                        vm.repo.fetchArchive(k)?.let { Triple(b.name, it.first, it.second) }
+                        vm.repo.fetchArchive(k)?.let { Triple(b.name, it.first, it.second) }?.let { k to it }
                     } catch (e: Exception) {
                         null
                     }
                 }
             }
-            data = res
+            branchKeys = res.map { it.first }
+            data = res.map { it.second }
             loading = false
             loaded = true
         }
@@ -70,6 +76,40 @@ fun CollectorsScreen(
     LaunchedEffect(Unit) { load() }
 
     Column(modifier = modifier.padding(padding)) {
+        val currentOpen = open
+        if (currentOpen != null) {
+            // عرض كشف محصل: تعديل + تصدير + حفظ يصل للجميع
+            val entry = data.getOrNull(branchKeys.indexOf(currentOpen.branchKey))
+            val list = if (currentOpen.isCurrent)
+                entry?.first ?: emptyList()
+            else
+                entry?.second?.getOrNull(currentOpen.idx)?.payments ?: emptyList()
+            AdminStatementScreen(
+                vm = vm,
+                branchKey = currentOpen.branchKey,
+                title = "${currentOpen.branchName} - ${if (currentOpen.isCurrent) "الكشف الحالي" else entry?.second?.getOrNull(currentOpen.idx)?.name ?: "كشف"}",
+                payments = list,
+                onBack = { open = null },
+                onSave = { saved ->
+                    val bi = branchKeys.indexOf(currentOpen.branchKey)
+                    if (bi >= 0) {
+                        val cur = entry?.first ?: emptyList()
+                        val pers = entry?.second?.toMutableList() ?: mutableListOf()
+                        val newCur = if (currentOpen.isCurrent) saved else cur
+                        if (!currentOpen.isCurrent && currentOpen.idx in pers.indices) {
+                            pers[currentOpen.idx].payments.clear()
+                            pers[currentOpen.idx].payments.addAll(saved)
+                        }
+                        val newEntry = Triple(currentOpen.branchName, newCur, pers)
+                        data = data.toMutableList().also { it[bi] = newEntry }
+                        vm.pushArchiveFor(currentOpen.branchKey, newCur, pers)
+                        vm.toast("✅ تم حفظ التعديلات على كشف ${currentOpen.branchName}")
+                    }
+                }
+            )
+            return@Column
+        }
+
         TopBar(vm, "كشوفات المحصلين", onRefresh = { load() }, onSettings = onSettings)
         when {
             loading && !loaded -> {
@@ -90,6 +130,7 @@ fun CollectorsScreen(
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     items(data.size, key = { i -> data[i].first }) { i ->
                         val (name, current, periods) = data[i]
+                        val bk = branchKeys.getOrElse(i) { "" }
                         var expanded by remember { mutableStateOf(false) }
                         Card(shape = RoundedCornerShape(20.dp)) {
                             Column(Modifier.fillMaxWidth()) {
@@ -119,14 +160,28 @@ fun CollectorsScreen(
                                         Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                         verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        Text("📄 الكشف الحالي (${current.size} دفعة)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                                        if (current.isNotEmpty()) {
-                                            Text("الإجمالي: ${formatNum(current.sumOf { it.amount })} د.ع", fontSize = 12.sp, color = Color.Gray)
+                                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                            Column(Modifier.weight(1f)) {
+                                                Text("📄 الكشف الحالي (${current.size} دفعة)", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                                                if (current.isNotEmpty()) {
+                                                    Text("الإجمالي: ${formatNum(current.sumOf { it.amount })} د.ع", fontSize = 12.sp, color = Color.Gray)
+                                                }
+                                            }
+                                            if (current.isNotEmpty()) {
+                                                Text(
+                                                    "فتح وتعديل ✏️",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = Green,
+                                                    modifier = Modifier.clickable { open = AdminOpen(bk, name, true, -1) }.padding(horizontal = 6.dp, vertical = 4.dp)
+                                                )
+                                            }
                                         }
                                         if (periods.isNotEmpty()) {
                                             Spacer(Modifier.height(4.dp))
                                             Text("🗂️ الكشوفات المغلقة", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                                             periods.sortedByDescending { it.createdAt }.forEach { p ->
+                                                val pIdx = periods.indexOf(p)
                                                 Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                                                     Column(Modifier.weight(1f)) {
                                                         Text("📁 ${p.name}", fontSize = 12.5.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -141,6 +196,13 @@ fun CollectorsScreen(
                                                         fontSize = 11.sp,
                                                         color = Color.Gray,
                                                         textAlign = TextAlign.End
+                                                    )
+                                                    Text(
+                                                        "فتح ✏️",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Green,
+                                                        modifier = Modifier.clickable { open = AdminOpen(bk, name, false, pIdx) }.padding(start = 10.dp, end = 2.dp)
                                                     )
                                                 }
                                             }
