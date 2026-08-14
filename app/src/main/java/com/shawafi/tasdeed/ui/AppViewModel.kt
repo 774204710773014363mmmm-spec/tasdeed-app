@@ -416,7 +416,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 myAccountPayments.value = myAccountPayments.value.filterNot { it.localId in ids }.toMutableList()
                 store.saveMyPayments(myAccountPayments.value)
             } else if (idx in myPeriods.value.indices) {
-                myPeriods.value[idx].payments = myPeriods.value[idx].payments.filterNot { it.localId in ids }.toMutableList()
+                val kept = myPeriods.value[idx].payments.filterNot { it.localId in ids }
+                myPeriods.value[idx].payments.clear()
+                myPeriods.value[idx].payments.addAll(kept)
                 store.saveMyPeriods(myPeriods.value)
             }
         } else {
@@ -425,7 +427,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 store.savePayments(currentPayments.value)
                 pushArchiveCloud()
             } else if (idx in periods.value.indices) {
-                periods.value[idx].payments = periods.value[idx].payments.filterNot { it.localId in ids }.toMutableList()
+                val kept = periods.value[idx].payments.filterNot { it.localId in ids }
+                periods.value[idx].payments.clear()
+                periods.value[idx].payments.addAll(kept)
                 store.savePeriods(periods.value)
                 pushArchiveCloud()
             }
