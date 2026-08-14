@@ -83,18 +83,18 @@ fun CollectorsScreen(
             val list = if (currentOpen.isCurrent)
                 entry?.first ?: emptyList()
             else
-                entry?.second?.getOrNull(currentOpen.idx)?.payments ?: emptyList()
+                entry?.third?.getOrNull(currentOpen.idx)?.payments ?: emptyList()
             AdminStatementScreen(
                 vm = vm,
                 branchKey = currentOpen.branchKey,
-                title = "${currentOpen.branchName} - ${if (currentOpen.isCurrent) "الكشف الحالي" else entry?.second?.getOrNull(currentOpen.idx)?.name ?: "كشف"}",
+                title = "${currentOpen.branchName} - ${if (currentOpen.isCurrent) "الكشف الحالي" else entry?.third?.getOrNull(currentOpen.idx)?.name ?: "كشف"}",
                 payments = list,
                 onBack = { open = null },
                 onSave = { saved ->
                     val bi = branchKeys.indexOf(currentOpen.branchKey)
                     if (bi >= 0) {
                         val cur = entry?.first ?: emptyList()
-                        val pers = entry?.second?.toMutableList() ?: mutableListOf()
+                        val pers = entry?.third?.toMutableList() ?: mutableListOf()
                         val newCur = if (currentOpen.isCurrent) saved else cur
                         if (!currentOpen.isCurrent && currentOpen.idx in pers.indices) {
                             pers[currentOpen.idx].payments.clear()
