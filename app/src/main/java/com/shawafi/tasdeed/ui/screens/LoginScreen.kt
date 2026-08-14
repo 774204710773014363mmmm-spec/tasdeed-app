@@ -33,6 +33,7 @@ import androidx.fragment.app.FragmentActivity
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
 import com.shawafi.tasdeed.ui.theme.GreenBrush
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +49,16 @@ fun LoginScreen(
     val loading by vm.loading.collectAsState()
     val context = LocalContext.current
     val bioEnabled by vm.bioEnabled.collectAsState()
+    var bioAutoShown by rememberSaveable { mutableStateOf(false) }
+
+    // البصمة مفعلة + بيانات محفوظة: افتح نافذة البصمة تلقائياً فور دخول الشاشة
+    LaunchedEffect(bioEnabled, vm.hasSavedCredentials()) {
+        if (bioEnabled && vm.hasSavedCredentials() && !bioAutoShown) {
+            bioAutoShown = true
+            delay(400)
+            launchFingerprint()
+        }
+    }
 
     fun launchFingerprint() {
         val activity = context as? FragmentActivity ?: return
