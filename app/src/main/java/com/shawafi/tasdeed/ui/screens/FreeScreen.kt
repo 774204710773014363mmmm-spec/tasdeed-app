@@ -53,9 +53,12 @@ fun FreeScreen(
     var renameTarget by remember { mutableStateOf<Int?>(null) }
     var infoTarget by remember { mutableStateOf<Int?>(null) }
     var deleteTarget by remember { mutableStateOf<Int?>(null) }
-    val myPayments by vm.myAccountPayments.collectAsState()
     val myPeriods by vm.myPeriods.collectAsState()
-    val total = myPayments.sumOf { it.amount }
+    // آخر كشف مفتوح = الكشف النشط الحالي، وكل الدفعات تُسجَّل فيه
+    val activeIdx = myPeriods.lastIndex
+    val activeList = myPeriods.lastOrNull()?.payments ?: emptyList()
+    val activeName = myPeriods.lastOrNull()?.name ?: ""
+    val total = activeList.sumOf { it.amount }
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var exporting by remember { mutableStateOf(false) }
@@ -69,7 +72,7 @@ fun FreeScreen(
                 try {
                     val os = ctx.contentResolver.openOutputStream(uri)
                     if (os == null) false else {
-                        ReportExporter.exportPdf(os, vm, "حساباتي", myPayments, isMy = true)
+                        ReportExporter.exportPdf(os, vm, activeName.ifEmpty { "حساباتي" }, activeList, isMy = true)
                         os.close(); true
                     }
                 } catch (e: Exception) { false }
@@ -87,7 +90,7 @@ fun FreeScreen(
                 try {
                     val os = ctx.contentResolver.openOutputStream(uri)
                     if (os == null) false else {
-                        ReportExporter.exportExcel(os, vm, "حساباتي", myPayments, isMy = true)
+                        ReportExporter.exportExcel(os, vm, activeName.ifEmpty { "حساباتي" }, activeList, isMy = true)
                         os.close(); true
                     }
                 } catch (e: Exception) { false }
@@ -115,8 +118,8 @@ fun FreeScreen(
                 try {
                     val f = File(ctx.cacheDir, "حساباتي.$ext")
                     val os = java.io.FileOutputStream(f)
-                    if (ext == "pdf") ReportExporter.exportPdf(os, vm, "حساباتي", myPayments, isMy = true)
-                    else ReportExporter.exportExcel(os, vm, "حساباتي", myPayments, isMy = true)
+                    if (ext == "pdf") ReportExporter.exportPdf(os, vm, activeName.ifEmpty { "حساباتي" }, activeList, isMy = true)
+                    else ReportExporter.exportExcel(os, vm, activeName.ifEmpty { "حساباتي" }, activeList, isMy = true)
                     os.close(); f
                 } catch (e: Exception) { null }
             }
@@ -137,36 +140,39 @@ fun FreeScreen(
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
                     Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("💼 الحساب الحالي", fontWeight = FontWeight.Bold)
-                        Text("${myPayments.size} دفعة | ${formatNum(total)} د.ع", fontSize = 13.sp, color = Color.Gray)
+                        Text("💼 الكشف النشط: ${activeName.ifEmpty { "لا يوجد كشف بعد" }}", fontWeight = FontWeight.Bold)
+                        Text("${activeList.size} دفعة | ${formatNum(total)} د.ع", fontSize = 13.sp, color = Color.Gray)
                         Spacer(Modifier.height(14.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             ActionPill(
                                 icon = Icons.Filled.Share,
                                 label = "مشاركة",
                                 onClick = { shOpen = true },
-                                enabled = myPayments.isNotEmpty() && !exporting,
+                                enabled = activeList.isNotEmpty() && !exporting,
                                 modifier = Modifier.weight(1f)
                             )
                             ActionPill(
                                 icon = Icons.Filled.FileDownload,
                                 label = "تنزيل",
                                 onClick = { dlOpen = true },
-                                enabled = myPayments.isNotEmpty() && !exporting,
+                                enabled = activeList.isNotEmpty() && !exporting,
                                 modifier = Modifier.weight(1f)
                             )
                             ActionPill(
                                 icon = Icons.Filled.AddCircle,
                                 label = "تسجيل دفعة",
-                                onClick = { showAdd = true },
+                                onClick = {
+                                    if (myPeriods.isEmpty()) { vm.toast("أنشئ كشف حساباتي أولاً", true); showNew = true }
+                                    else showAdd = true
+                                },
                                 highlight = true,
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                        if (myPayments.isNotEmpty()) {
+                        if (activeList.isNotEmpty() && activeIdx >= 0) {
                             Spacer(Modifier.height(10.dp))
                             OutlinedButton(
-                                onClick = { onOpenStatement("حساباتي الحالية", -1, "my") },
+                                onClick = { onOpenStatement(activeName, activeIdx, "my") },
                                 modifier = Modifier.fillMaxWidth()
                             ) { Text("📄 عرض الكشف") }
                         }
@@ -314,7 +320,7 @@ fun FreeScreen(
     if (showNew) {
         NewPeriodDialog(
             title = "➕ فتح كشف حساباتي جديد",
-            subtitle = "سيتم نقل دفعات الحساب الحالي إلى الكشف الجديد",
+            subtitle = "سيُسجَّل في هذا الكشف كل الدفعات الجديدة حتى تفتح كشفاً آخر",
             buttonText = "فتح",
             onOpen = { vm.newMyPeriod(it) },
             onDismiss = { showNew = false }
