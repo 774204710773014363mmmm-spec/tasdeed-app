@@ -68,13 +68,14 @@ fun StatementScreen(
         (if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList())
 
     var sortMode by remember { mutableStateOf(StatementSort.DATE) }
-    val grouped = remember(list, sortMode, isMy) {
-        if (isMy) {
-            // كل دفعة = صف مستقل (حساباتي ليست بأسماء مشتركين)
+    val mergeOps by vm.mergeOps.collectAsState()
+    val grouped = remember(list, sortMode, isMy, mergeOps) {
+        if (isMy || !mergeOps) {
+            // كل دفعة = صف مستقل (حساباتي أو دمج العمليات مطفأ)
             val rows = list.map { p ->
                 ReportExporter.SubGroup(
                     key = p.localId,
-                    name = p.note.ifEmpty { "دفعة" },
+                    name = if (isMy) p.note.ifEmpty { "دفعة" } else p.subscriberName,
                     meter = p.meterNumber.ifEmpty { "" },
                     num = "",
                     total = p.amount,
@@ -122,8 +123,8 @@ fun StatementScreen(
         return try {
             val f = File(ctx.cacheDir, "كشف_${name.replace(" ", "_").replace("/", "_")}.$ext")
             val os = java.io.FileOutputStream(f)
-            if (ext == "pdf") ReportExporter.exportPdf(os, vm, name, list, sortMode)
-            else ReportExporter.exportExcel(os, vm, name, list, sortMode)
+            if (ext == "pdf") ReportExporter.exportPdf(os, vm, name, list, sortMode, isMy = isMy, merge = mergeOps)
+            else ReportExporter.exportExcel(os, vm, name, list, sortMode, isMy = isMy, merge = mergeOps)
             os.close()
             f
         } catch (e: Exception) { null }
@@ -148,7 +149,7 @@ fun StatementScreen(
                 try {
                     val os = ctx.contentResolver.openOutputStream(uri)
                     if (os == null) false else {
-                        ReportExporter.exportPdf(os, vm, name, list, sortMode)
+                        ReportExporter.exportPdf(os, vm, name, list, sortMode, isMy = isMy, merge = mergeOps)
                         os.close(); true
                     }
                 } catch (e: Exception) { false }
@@ -167,7 +168,7 @@ fun StatementScreen(
                 try {
                     val os = ctx.contentResolver.openOutputStream(uri)
                     if (os == null) false else {
-                        ReportExporter.exportExcel(os, vm, name, list, sortMode)
+                        ReportExporter.exportExcel(os, vm, name, list, sortMode, isMy = isMy, merge = mergeOps)
                         os.close(); true
                     }
                 } catch (e: Exception) { false }
@@ -372,7 +373,7 @@ fun StatementScreen(
             (if (isCurrent) myCur else myPeriods.getOrNull(idx)?.payments ?: emptyList())
         else
             (if (isCurrent) currentPayments else periods.getOrNull(idx)?.payments ?: emptyList())
-        val subPays = if (isMy) raw.filter { it.localId == target.key }
+        val subPays = if (isMy || !mergeOps) raw.filter { it.localId == target.key }
             else raw.filter { it.subscriberId.ifEmpty { it.meterNumber.ifEmpty { it.subscriberName } } == target.key }
         Dialog(onDismissRequest = { editTarget = null }) {
             Surface(shape = RoundedCornerShape(20.dp)) {
@@ -401,6 +402,15 @@ fun StatementScreen(
                         }
                     }
                     Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = {
+                            vm.deletePaymentsFromStatement(isCurrent, idx, isMy, subPays.map { it.localId }.toSet())
+                            editTarget = null
+                        },
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                    ) { Text("🗑️ حذف هذه الدفعات من الكشف", color = Color.White, fontWeight = FontWeight.Bold) }
+                    Spacer(Modifier.height(10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(onClick = { editTarget = null }, modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
                         Button(
