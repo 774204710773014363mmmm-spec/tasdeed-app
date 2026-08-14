@@ -32,6 +32,17 @@ object FirebaseClient {
         }
     }
 
+    /** HTTP 200 → النص الخام ("null"/فارغ = العقدة محذوفة/فارغة)، خطأ شبكة/سيرفر → null */
+    fun getRaw(path: String): String? {
+        val url = "$DB_URL/$path.json"
+        val req = Request.Builder().url(url).build()
+        return try {
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) null else resp.body?.string()?.trim()
+            }
+        } catch (e: Exception) { null }
+    }
+
     fun post(path: String, payload: JSONObject): JSONObject? {
         val url = "$DB_URL/$path.json"
         val req = Request.Builder().url(url)
