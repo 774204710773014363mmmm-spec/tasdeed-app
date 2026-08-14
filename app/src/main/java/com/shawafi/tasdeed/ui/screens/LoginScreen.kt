@@ -51,39 +51,40 @@ fun LoginScreen(
 
     fun launchFingerprint() {
         val activity = context as? FragmentActivity ?: return
-        when (BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
-            BiometricManager.BIOMETRIC_SUCCESS -> {
-                val prompt = BiometricPrompt(
-                    activity,
-                    ContextCompat.getMainExecutor(context),
-                    object : BiometricPrompt.AuthenticationCallback() {
-                        override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                            vm.loginWithSavedCredentials()
-                        }
+        try {
+            when (BiometricManager.from(context).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)) {
+                BiometricManager.BIOMETRIC_SUCCESS -> {
+                    val prompt = BiometricPrompt(
+                        activity,
+                        ContextCompat.getMainExecutor(context),
+                        object : BiometricPrompt.AuthenticationCallback() {
+                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                vm.loginWithSavedCredentials()
+                            }
 
-                        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                            if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON && errorCode != BiometricPrompt.ERROR_USER_CANCELED) {
-                                vm.toast("❌ ${errString}", true)
+                            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                if (errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON && errorCode != BiometricPrompt.ERROR_USER_CANCELED) {
+                                    vm.toast("❌ ${errString}", true)
+                                }
                             }
                         }
-                    }
-                )
-                prompt.authenticate(
-                    BiometricPrompt.PromptInfo.Builder()
-                        .setTitle("تسجيل الدخول بالبصمة")
-                        .setSubtitle("ضع بصمتك أو استخدم قفل الشاشة")
-                        .setNegativeButtonText("إلغاء")
-                        .setAllowedAuthenticators(
-                            BiometricManager.Authenticators.BIOMETRIC_STRONG or
-                                BiometricManager.Authenticators.DEVICE_CREDENTIAL
-                        )
-                        .build()
-                )
+                    )
+                    prompt.authenticate(
+                        BiometricPrompt.PromptInfo.Builder()
+                            .setTitle("تسجيل الدخول بالبصمة")
+                            .setSubtitle("ضع بصمتك للدخول")
+                            .setNegativeButtonText("إلغاء")
+                            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                            .build()
+                    )
+                }
+                BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
+                    vm.toast("⚠️ لا توجد بصمة مسجلة في الجوال", true)
+                else ->
+                    vm.toast("❌ الجوال لا يدعم البصمة", true)
             }
-            BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED ->
-                vm.toast("⚠️ لا توجد بصمة مسجلة في الجوال", true)
-            else ->
-                vm.toast("❌ الجوال لا يدعم البصمة", true)
+        } catch (e: Exception) {
+            vm.toast("❌ تعذر فتح البصمة: ${e.message ?: "خطأ غير معروف"}", true)
         }
     }
 
@@ -112,9 +113,9 @@ fun LoginScreen(
                 Text("⚡", fontSize = 38.sp)
             }
             Spacer(Modifier.height(14.dp))
-            Text("تسديد الحطباني", fontSize = 27.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text("تسديد الشوافي", fontSize = 27.sp, fontWeight = FontWeight.Black, color = Color.White)
             Text(
-                "محطة كهرباء الشوافي",
+                "محطة كهرباء الحطباني",
                 fontSize = 13.sp,
                 color = Color.White.copy(alpha = 0.85f)
             )
