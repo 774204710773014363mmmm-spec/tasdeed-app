@@ -51,15 +51,6 @@ fun LoginScreen(
     val bioEnabled by vm.bioEnabled.collectAsState()
     var bioAutoShown by rememberSaveable { mutableStateOf(false) }
 
-    // البصمة مفعلة + بيانات محفوظة: افتح نافذة البصمة تلقائياً فور دخول الشاشة
-    LaunchedEffect(bioEnabled, vm.hasSavedCredentials()) {
-        if (bioEnabled && vm.hasSavedCredentials() && !bioAutoShown) {
-            bioAutoShown = true
-            delay(400)
-            launchFingerprint()
-        }
-    }
-
     fun launchFingerprint() {
         val activity = context as? FragmentActivity ?: return
         try {
@@ -96,6 +87,15 @@ fun LoginScreen(
             }
         } catch (e: Exception) {
             vm.toast("❌ تعذر فتح البصمة: ${e.message ?: "خطأ غير معروف"}", true)
+        }
+    }
+
+    // البصمة مفعلة + بيانات محفوظة: افتح نافذة البصمة تلقائياً فور دخول الشاشة
+    LaunchedEffect(bioEnabled, vm.hasSavedCredentials()) {
+        if (bioEnabled && vm.hasSavedCredentials() && !bioAutoShown) {
+            bioAutoShown = true
+            delay(400)
+            launchFingerprint()
         }
     }
 
