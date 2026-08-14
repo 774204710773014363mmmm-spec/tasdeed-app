@@ -20,14 +20,20 @@ object ReportExporter {
         val total: Double
     )
 
-    private fun buildRows(list: List<PaymentRecord>, sort: StatementSort, isMy: Boolean): List<RowData> {
-        if (isMy) {
+    private fun buildRows(list: List<PaymentRecord>, sort: StatementSort, isMy: Boolean, merge: Boolean): List<RowData> {
+        if (isMy || !merge) {
             val rows = list.map {
-                RowData(it.note.ifEmpty { "دفعة" }, "", it.paymentDate, it.note, it.amount)
+                RowData(
+                    if (isMy) it.note.ifEmpty { "دفعة" } else it.subscriberName,
+                    it.meterNumber,
+                    it.paymentDate,
+                    it.note,
+                    it.amount
+                )
             }
             return when (sort) {
                 StatementSort.NAME -> rows.sortedBy { it.name }
-                StatementSort.METER -> rows
+                StatementSort.METER -> rows.sortedBy { it.meter.toLongOrNull() ?: Long.MAX_VALUE }
                 StatementSort.DATE -> rows.sortedByDescending { it.latestDate }
             }
         }
@@ -48,9 +54,10 @@ object ReportExporter {
         periodName: String,
         list: List<PaymentRecord>,
         sort: StatementSort = StatementSort.DATE,
-        isMy: Boolean = false
+        isMy: Boolean = false,
+        merge: Boolean = true
     ) {
-        val rows = buildRows(list, sort, isMy)
+        val rows = buildRows(list, sort, isMy, merge)
         val today = vm.repo.currentDate()
         val brName = vm.branchName.value.ifEmpty { vm.branchKey.value ?: "" }
         val user = vm.user.value ?: ""
@@ -134,9 +141,10 @@ object ReportExporter {
         periodName: String,
         list: List<PaymentRecord>,
         sort: StatementSort = StatementSort.DATE,
-        isMy: Boolean = false
+        isMy: Boolean = false,
+        merge: Boolean = true
     ) {
-        val rows = buildRows(list, sort, isMy)
+        val rows = buildRows(list, sort, isMy, merge)
         val today = vm.repo.currentDate()
         val brName = vm.branchName.value.ifEmpty { vm.branchKey.value ?: "" }
         val user = vm.user.value ?: ""
