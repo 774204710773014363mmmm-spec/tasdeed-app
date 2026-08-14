@@ -38,6 +38,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val fontScale = MutableStateFlow(store.getInt("font_scale", 100))
     val bioEnabled = MutableStateFlow(store.getBool("bio_enabled"))
     val devMode = MutableStateFlow(store.getBool("dev_mode", false))
+    val mergeOps = MutableStateFlow(store.getBool("merge_ops", false))
     val nowTick = MutableStateFlow(System.currentTimeMillis())
 
     val subscribers = MutableStateFlow<List<Subscriber>>(emptyList())
@@ -119,6 +120,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setDevMode(on: Boolean) {
         store.putBool("dev_mode", on)
         devMode.value = on
+    }
+
+    // دمج العمليات: عندما يكون مفعلاً تندمج دفعات نفس المشترك في صف واحد
+    fun setMergeOps(on: Boolean) {
+        store.putBool("merge_ops", on)
+        mergeOps.value = on
     }
 
     fun setUiFps(fps: Int) {
@@ -295,6 +302,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         pendingPayments.value = (pendingPayments.value + rec).toMutableList()
         savePendingList("pending_payments")
         saveToArchive(rec, periodIdx)
+        // تذكّر آخر كشف سُدّد فيه هذا المشترك (محلياً على هذا الجهاز)
+        val stmtName = if (periodIdx == null) "current" else periods.value.getOrNull(periodIdx)?.name ?: "current"
+        store.putString("last_stmt_${sub.key}", stmtName)
         toast("تم تسجيل ${amount} د.ع 💰")
         if (hasNetwork()) syncPendingPayments()
     }
@@ -397,6 +407,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             store.saveMyPeriods(myPeriods.value)
         }
         toast("✅ تم حفظ التعديلات")
+    }
+
+    fun deletePaymentsFromStatement(isCurrent: Boolean, idx: Int, isMy: Boolean, ids: Set<String>) {
+        if (ids.isEmpty()) return
+        if (isMy) {
+            if (isCurrent) {
+                myAccountPayments.value = myAccountPayments.value.filterNot { it.localId in ids }.toMutableList()
+                store.saveMyPayments(myAccountPayments.value)
+            } else if (idx in myPeriods.value.indices) {
+                myPeriods.value[idx].payments = myPeriods.value[idx].payments.filterNot { it.localId in ids }.toMutableList()
+                store.saveMyPeriods(myPeriods.value)
+            }
+        } else {
+            if (isCurrent) {
+                currentPayments.value = currentPayments.value.filterNot { it.localId in ids }.toMutableList()
+                store.savePayments(currentPayments.value)
+                pushArchiveCloud()
+            } else if (idx in periods.value.indices) {
+                periods.value[idx].payments = periods.value[idx].payments.filterNot { it.localId in ids }.toMutableList()
+                store.savePeriods(periods.value)
+                pushArchiveCloud()
+            }
+        }
+        toast("🗑️ تم حذف الدفعات")
     }
 
     fun syncPendingPayments() {
