@@ -151,7 +151,45 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val u = store.getString("saved_user") ?: return
         val p = store.getString("saved_pass") ?: return
         if (isLoggedIn.value) return
-        login(u, p, remember = true, useNetwork = true)
+        viewModelScope.launch {
+            loading.value = true
+            var result: Pair<String, Branch>? = null
+            var usedNetwork = true
+            withContext(Dispatchers.IO) {
+                if (hasNetwork()) {
+                    try {
+                        repo.cacheAllData()
+                        result = repo.login(u, p)
+                    } catch (e: Exception) {}
+                }
+                if (result == null) {
+                    // دخول محلي من المخبأ (يعمل بدون إنترنت أيضاً)
+                    usedNetwork = false
+                    try {
+                        repo.loadFromCache()
+                        result = repo.login(u, p)
+                    } catch (e: Exception) {}
+                }
+            }
+            loading.value = false
+            if (result == null) {
+                toast("فشل الدخول بالبصمة — تحقق من بياناتك أو من النت", true)
+            } else {
+                val (k, b) = result as Pair<String, Branch>
+                repo.setSession(k, u)
+                user.value = u
+                branchKey.value = k
+                branchName.value = b.name
+                isLoggedIn.value = true
+                reloadSubscribers()
+                startLocksLoop()
+                if (usedNetwork) {
+                    fetchFreePayments()
+                    fetchArchiveFromCloud()
+                }
+                toast("مرحباً $u 👋")
+            }
+        }
     }
 
     private fun startFrameTick() {
