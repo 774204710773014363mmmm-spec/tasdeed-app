@@ -40,7 +40,9 @@ class AppRepository(val store: LocalStore) {
                 .put("id", v.id).put("name", v.name).put("meter_number", v.meterNumber)
                 .put("subscriber_number", v.subscriberNumber)
                 .put("unpaid_balance", v.unpaidBalance).put("last_amount", v.lastAmount)
-                .put("is_active", if (v.isActive) 1 else 0).put("sync_key", v.syncKey))
+                .put("is_active", if (v.isActive) 1 else 0).put("sync_key", v.syncKey)
+                .put("hidden", if (v.hidden) 1 else 0)
+                .put("hide_amounts", if (v.hideAmounts) 1 else 0))
         }
         store.putJson("subscribers", o)
     }
@@ -123,6 +125,29 @@ class AppRepository(val store: LocalStore) {
         o?.let { store.putJson("app_config", it) }
         return AppConfig.from(o ?: store.getJsonObject("app_config"))
     }
+
+    /** تحديث علامات الرؤية للمشترك (إخفاء عن الفروع / إخفاء المبالغ) في السحابة والمخبأ المحلي */
+    fun updateSubscriberVisibility(key: String, hidden: Boolean?, hideAmounts: Boolean?): Boolean {
+        val sub = subscribersCache[key] ?: return false
+        val payload = JSONObject()
+        hidden?.let { payload.put("hidden", if (it) 1 else 0) }
+        hideAmounts?.let { payload.put("hide_amounts", if (it) 1 else 0) }
+        if (payload.length() == 0) return false
+        val ok = try {
+            FirebaseClient.update("${FirebaseClient.ROOT}/subscribers/$key", payload)
+        } catch (e: Exception) { false }
+        if (ok) {
+            subscribersCache[key] = sub.copy(
+                hidden = hidden ?: sub.hidden,
+                hideAmounts = hideAmounts ?: sub.hideAmounts
+            )
+            saveLocalSubscribers(subscribersCache)
+        }
+        return ok
+    }
+
+    /** كل المشتركين بما فيهم المخفيين (لشاشة إدارة المشتركين) */
+    fun getAllSubscribers(): List<Subscriber> = subscribersCache.values.toList()
 
     suspend fun cacheAllData() = withContext(Dispatchers.IO) {
         fetchBranches()
