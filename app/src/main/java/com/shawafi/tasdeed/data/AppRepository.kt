@@ -192,12 +192,47 @@ class AppRepository(val store: LocalStore) {
     // ---------- payments ----------
 
     fun pushPendingPayment(record: PaymentRecord): Boolean {
+        // منع التكرار: إذا وُجدت نفس الدفعة (نفس local_id) في السحابة مسبقاً
+        // (رفع سابق نجح لكن انقطع الرد)، نعتبرها مرفوعة ولا نرفع نسخة جديدة
+        if (record.localId.isNotEmpty()) {
+            try {
+                val root = FirebaseClient.get("${FirebaseClient.ROOT}/pending_payments")
+                if (root != null) {
+                    val it = root.keys()
+                    while (it.hasNext()) {
+                        val k = it.next()
+                        val v = root.optJSONObject(k)
+                        if (v != null && v.optString("local_id") == record.localId) {
+                            bumpCacheVersion()
+                            return true
+                        }
+                    }
+                }
+            } catch (e: Exception) {}
+        }
         val key = FirebaseClient.post("${FirebaseClient.ROOT}/pending_payments", record.toJson()) ?: return false
         bumpCacheVersion()
         return key.length() > 0
     }
 
     fun pushFreePayment(record: FreePayment): Boolean {
+        // منع التكرار: نفس منطق الدفعات — نتحقق من local_id أولاً
+        if (record.localId.isNotEmpty()) {
+            try {
+                val root = FirebaseClient.get("${FirebaseClient.ROOT}/free_payments")
+                if (root != null) {
+                    val it = root.keys()
+                    while (it.hasNext()) {
+                        val k = it.next()
+                        val v = root.optJSONObject(k)
+                        if (v != null && v.optString("local_id") == record.localId) {
+                            bumpCacheVersion()
+                            return true
+                        }
+                    }
+                }
+            } catch (e: Exception) {}
+        }
         val key = FirebaseClient.post("${FirebaseClient.ROOT}/free_payments", record.toJson()) ?: return false
         bumpCacheVersion()
         return key.length() > 0
