@@ -33,7 +33,9 @@ data class Subscriber(
     val unpaidBalance: Double,
     val lastAmount: Double,
     val isActive: Boolean,
-    val syncKey: String
+    val syncKey: String,
+    val hidden: Boolean = false,
+    val hideAmounts: Boolean = false
 ) {
     val displayBalance: Double get() = unpaidBalance + lastAmount
 
@@ -49,7 +51,9 @@ data class Subscriber(
                     unpaidBalance = o.optDouble("unpaid_balance", 0.0),
                     lastAmount = o.optDouble("last_amount", 0.0),
                     isActive = o.optString("is_active") != "0",
-                    syncKey = o.optString("sync_key")
+                    syncKey = o.optString("sync_key"),
+                    hidden = o.optInt("hidden", 0) == 1,
+                    hideAmounts = o.optInt("hide_amounts", 0) == 1
                 )
             } catch (e: Exception) { null }
         }
