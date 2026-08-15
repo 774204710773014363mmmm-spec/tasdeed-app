@@ -71,8 +71,9 @@ fun HomeScreen(
 
         if (query.isBlank()) {
             if (devMode) {
-                val dueSum = remember(subscribers) { subscribers.filter { it.displayBalance > 0 }.sumOf { it.displayBalance } }
-                val dueCount = remember(subscribers) { subscribers.count { it.displayBalance > 0 } }
+                val visible = remember(subscribers) { subscribers.filter { !it.hideAmounts } }
+                val dueSum = remember(visible) { visible.filter { it.displayBalance > 0 }.sumOf { it.displayBalance } }
+                val dueCount = remember(visible) { visible.count { it.displayBalance > 0 } }
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(20.dp),
@@ -151,11 +152,15 @@ fun SubscriberCard(sub: Subscriber, isLocked: Boolean, onClick: () -> Unit) {
                 Row {
                     Text("📟 ${sub.meterNumber.ifEmpty { "-" }}", fontSize = 12.sp, color = Color.Gray)
                     Spacer(Modifier.width(12.dp))
-                    Text(
-                        "💰 ${formatNum(sub.displayBalance)} د.ع",
-                        fontSize = 12.sp,
-                        color = if (sub.displayBalance > 0) Color(0xFFDC2626) else Green
-                    )
+                    if (sub.hideAmounts) {
+                        Text("💰 🔒 مخفي", fontSize = 12.sp, color = Color.Gray)
+                    } else {
+                        Text(
+                            "💰 ${formatNum(sub.displayBalance)} د.ع",
+                            fontSize = 12.sp,
+                            color = if (sub.displayBalance > 0) Color(0xFFDC2626) else Green
+                        )
+                    }
                 }
             }
             if (isLocked) {
@@ -175,7 +180,7 @@ fun formatNum(v: Double): String {
 
 @Composable
 fun PayDialog(vm: AppViewModel, sub: Subscriber, locked: Boolean, onDismiss: () -> Unit) {
-    var amount by remember { mutableStateOf(if (sub.displayBalance > 0) sub.displayBalance.toString() else "") }
+    var amount by remember { mutableStateOf(if (sub.displayBalance > 0 && !sub.hideAmounts) sub.displayBalance.toString() else "") }
     var note by remember { mutableStateOf("") }
     val periods by vm.periods.collectAsState()
     // آخر كشف سُدّد فيه هذا المشترك على هذا الجهاز (يضل محفوظاً حتى تغييره)
@@ -196,7 +201,11 @@ fun PayDialog(vm: AppViewModel, sub: Subscriber, locked: Boolean, onDismiss: () 
             Column(Modifier.padding(20.dp)) {
                 Text("💰 تسديد: ${sub.name}", fontWeight = FontWeight.Bold, fontSize = 17.sp)
                 Spacer(Modifier.height(6.dp))
-                Text("📟 ${sub.meterNumber.ifEmpty { "-" }} | المطلوب: ${formatNum(sub.displayBalance)} د.ع", fontSize = 12.sp, color = Color.Gray)
+                if (sub.hideAmounts) {
+                    Text("📟 ${sub.meterNumber.ifEmpty { "-" }} | المبلغ: 🔒 مخفي", fontSize = 12.sp, color = Color.Gray)
+                } else {
+                    Text("📟 ${sub.meterNumber.ifEmpty { "-" }} | المطلوب: ${formatNum(sub.displayBalance)} د.ع", fontSize = 12.sp, color = Color.Gray)
+                }
 
                 if (locked) {
                     Spacer(Modifier.height(12.dp))
