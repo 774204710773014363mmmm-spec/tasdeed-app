@@ -42,6 +42,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val nowTick = MutableStateFlow(System.currentTimeMillis())
 
     val subscribers = MutableStateFlow<List<Subscriber>>(emptyList())
+    // كل المشتركين غير المفلترين (يُستخدم في شاشة إدارة المشتركين بوضع المطور)
+    val allSubscribers = MutableStateFlow<List<Subscriber>>(emptyList())
     val locks = MutableStateFlow<Map<String, Long>>(emptyMap())
 
     val currentPayments = MutableStateFlow<MutableList<PaymentRecord>>(store.loadPayments())
@@ -120,6 +122,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setDevMode(on: Boolean) {
         store.putBool("dev_mode", on)
         devMode.value = on
+        // عند التفعيل يظهر المشتركون المخفيون، وعند الإيقاف يختفون
+        applySubscriberFilter()
     }
 
     // دمج العمليات: عندما يكون مفعلاً تندمج دفعات نفس المشترك في صف واحد
@@ -277,10 +281,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 val list = withContext(Dispatchers.IO) { repo.fetchSubscribers() }
-                subscribers.value = list.values.sortedBy { it.name }
+                allSubscribers.value = list.values.sortedBy { it.name }
+                applySubscriberFilter()
             } catch (e: Exception) {
                 // بدون إنترنت: نعرض المخبأ المحلي حتى لا ينهار التطبيق
-                subscribers.value = repo.getSubscribers().values.sortedBy { it.name }
+                allSubscribers.value = repo.getSubscribers().values.sortedBy { it.name }
+                applySubscriberFilter()
+            }
+        }
+    }
+
+    /** فلترة المشتركين: المخفيون (hidden) يظهرون فقط لجهاز المطور */
+    private fun applySubscriberFilter() {
+        subscribers.value = if (devMode.value) allSubscribers.value
+            else allSubscribers.value.filterNot { it.hidden }
+    }
+
+    fun setSubscriberHidden(key: String, hidden: Boolean) {
+        viewModelScope.launch {
+            val sub = allSubscribers.value.firstOrNull { it.key == key } ?: return@launch
+            // تحديث فوري محلياً ثم مزامنة السحابة
+            allSubscribers.value = allSubscribers.value.map {
+                if (it.key == key) it.copy(hidden = hidden) else it
+            }
+            applySubscriberFilter()
+            val ok = withContext(Dispatchers.IO) { repo.updateSubscriberVisibility(key, hidden, null) }
+            if (ok) {
+                toast(if (hidden) "🙈 تم إخفاء المشترك عن الفروع الأخرى" else "👁️ أصبح المشترك ظاهراً للجميع")
+            } else {
+                toast("تعذرت المزامنة مع السحابة (تحقق من النت)", true)
+            }
+        }
+    }
+
+    fun setSubscriberHideAmounts(key: String, hideAmounts: Boolean) {
+        viewModelScope.launch {
+            val sub = allSubscribers.value.firstOrNull { it.key == key } ?: return@launch
+            allSubscribers.value = allSubscribers.value.map {
+                if (it.key == key) it.copy(hideAmounts = hideAmounts) else it
+            }
+            applySubscriberFilter()
+            val ok = withContext(Dispatchers.IO) { repo.updateSubscriberVisibility(key, null, hideAmounts) }
+            if (ok) {
+                toast(if (hideAmounts) "🔒 تم إخفاء المبالغ عن كل الفروع" else "💰 المبالغ أصبحت ظاهرة للجميع")
+            } else {
+                toast("تعذرت المزامنة مع السحابة (تحقق من النت)", true)
             }
         }
     }
