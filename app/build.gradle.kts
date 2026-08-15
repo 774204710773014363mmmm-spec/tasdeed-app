@@ -19,7 +19,7 @@ android {
         applicationId = "com.shawafi.tasdeed"
         minSdk = 24
         targetSdk = 35
-        versionCode = 45
+        versionCode = 47
         versionName = "1.0"
     }
 
