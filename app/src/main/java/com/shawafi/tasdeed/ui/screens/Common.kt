@@ -38,6 +38,7 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
         val items = buildList {
             add(NavItem("home", "الفواتير", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong))
             if (devMode) add(NavItem("collectors", "كشوفات المحصلين", Icons.Filled.People, Icons.Outlined.People))
+            if (devMode) add(NavItem("manage_subs", "إدارة المشتركين", Icons.Filled.Group, Icons.Outlined.Group))
             add(NavItem("archive", "الكشوفات", Icons.Filled.Archive, Icons.Outlined.Archive))
             add(NavItem("free", "حساباتي", Icons.Filled.AccountBalanceWallet, Icons.Outlined.AccountBalanceWallet))
         }
