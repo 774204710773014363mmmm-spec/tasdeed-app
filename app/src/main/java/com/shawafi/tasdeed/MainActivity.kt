@@ -23,6 +23,7 @@ import com.shawafi.tasdeed.ui.screens.CollectorsScreen
 import com.shawafi.tasdeed.ui.screens.FreeScreen
 import com.shawafi.tasdeed.ui.screens.HomeScreen
 import com.shawafi.tasdeed.ui.screens.LoginScreen
+import com.shawafi.tasdeed.ui.screens.ManageSubsScreen
 import com.shawafi.tasdeed.ui.screens.SettingsScreen
 import com.shawafi.tasdeed.ui.screens.SplashScreen
 import com.shawafi.tasdeed.ui.screens.StatementScreen
@@ -112,6 +113,7 @@ fun MainNav(
         "free" -> FreeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement, onSettings = { onNav("settings") })
         "archive" -> ArchiveScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onOpenStatement = onOpenStatement, onSettings = { onNav("settings") })
         "collectors" -> CollectorsScreen(vm, Modifier.fillMaxSize(), padding, onSettings = { onNav("settings") })
+        "manage_subs" -> ManageSubsScreen(vm, Modifier.fillMaxSize(), padding)
         "settings" -> SettingsScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav)
         else -> HomeScreen(vm, Modifier.fillMaxSize(), padding, onNav = onNav, onSettings = { onNav("settings") })
     }
