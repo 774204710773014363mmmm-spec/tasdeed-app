@@ -69,61 +69,107 @@ object ReportExporter {
         val titlePaint = Paint().apply { color = 0xFF0284C7.toInt(); textSize = 30f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
         val subPaint = Paint().apply { color = 0xFF333333.toInt(); textSize = 17f; textAlign = Paint.Align.CENTER }
         val smallPaint = Paint().apply { color = 0xFF666666.toInt(); textSize = 14f; textAlign = Paint.Align.CENTER }
-        val labelPaint = Paint().apply { color = 0xFF0284C7.toInt(); textSize = 20f; isFakeBoldText = true; textAlign = Paint.Align.RIGHT }
-        val valuePaint = Paint().apply { color = 0xFF111111.toInt(); textSize = 19f; textAlign = Paint.Align.RIGHT }
         val totalPaint = Paint().apply { color = 0xFFD4A843.toInt(); textSize = 30f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
-        val numPaint = Paint().apply { color = 0xFF059669.toInt(); textSize = 34f; isFakeBoldText = true; textAlign = Paint.Align.RIGHT }
+        val headPaint = Paint().apply { color = 0xFFFFFFFF.toInt(); textSize = 15f; isFakeBoldText = true; textAlign = Paint.Align.CENTER }
+        val headBg = Paint().apply { color = 0xFF0284C7.toInt() }
+        val cellPaint = Paint().apply { color = 0xFF111111.toInt(); textSize = 14f; textAlign = Paint.Align.RIGHT }
+        val cellNumPaint = Paint().apply { color = 0xFF059669.toInt(); textSize = 15f; isFakeBoldText = true; textAlign = Paint.Align.RIGHT }
+        val seqPaint = Paint().apply { color = 0xFF475569.toInt(); textSize = 14f; textAlign = Paint.Align.CENTER }
+        val altBg = Paint().apply { color = 0xFFF1F5F9.toInt() }
 
-        rows.forEachIndexed { i, s ->
-            val page = doc.startPage(PdfDocument.PageInfo.Builder(842, 1123, i + 1).create())
+        // أعمدة من اليمين لليسار: م | اسم المشترك | رقم العداد | آخر تاريخ | ملاحظة | الإجمالي
+        data class Col(val title: String, val w: Float)
+        val cols = listOf(
+            Col("م", 50f), Col("اسم المشترك", 220f), Col("رقم العداد", 110f),
+            Col("آخر تاريخ", 100f), Col("ملاحظة", 130f), Col("الإجمالي", 112f)
+        )
+        val rightEdge = pageW - 60f
+        val colRights = FloatArray(cols.size)
+        var acc = rightEdge
+        cols.forEachIndexed { i, c -> colRights[i] = acc; acc -= c.w }
+        val leftEdge = acc
+
+        val lineH = 20f
+        fun linesFor(text: String, paint: Paint, maxW: Float): Int {
+            if (text.isEmpty()) return 1
+            var n = 1
+            var remain = text
+            while (remain.isNotEmpty()) {
+                val m = FloatArray(1)
+                val c = paint.breakText(remain, true, maxW, m)
+                if (c <= 0) break
+                remain = remain.substring(c)
+                if (remain.isNotEmpty()) n++
+            }
+            return n
+        }
+        fun rowHeight(s: RowData): Float {
+            val nameL = linesFor(s.name, cellPaint, cols[1].w - 20f)
+            val noteL = linesFor(s.note, cellPaint, cols[4].w - 20f)
+            return (maxOf(nameL, noteL) * lineH + 14f).coerceAtLeast(36f)
+        }
+
+        val headerTop = 200f
+        val headerH = 36f
+        val top = headerTop + headerH
+        val bottom = pageH - 50f
+
+        // توزيع الصفوف على صفحات: كل صفحة تمتلئ بالصفوف (≈26 صفاً) ثم صفحة جديدة
+        val pages = mutableListOf<MutableList<RowData>>()
+        var cur = mutableListOf<RowData>()
+        var yy = top
+        for (r in rows) {
+            val h = rowHeight(r)
+            if (yy + h > bottom && cur.isNotEmpty()) {
+                pages.add(cur)
+                cur = mutableListOf()
+                yy = top
+            }
+            cur.add(r)
+            yy += h
+        }
+        if (cur.isNotEmpty()) pages.add(cur)
+        if (pages.isEmpty()) pages.add(mutableListOf())
+
+        var globalIdx = 0
+        pages.forEachIndexed { pi, pageRows ->
+            val page = doc.startPage(PdfDocument.PageInfo.Builder(842, 1123, pi + 1).create())
             val canvas = page.canvas
 
             canvas.drawRect(0f, 0f, pageW, 6f, Paint().apply { color = 0xFF0284C7.toInt() })
-            canvas.drawText("💰 تقرير المدفوعات - $user", pageW / 2f, 55f, titlePaint)
-            canvas.drawText("$brName | $periodName", pageW / 2f, 88f, subPaint)
-            canvas.drawText("التاريخ: $today | عدد الدفعات: ${rows.size}", pageW / 2f, 114f, smallPaint)
-            canvas.drawText("الإجمالي الكلي: ${numFmt.format(total)} د.ع", pageW / 2f, 148f, totalPaint)
-            canvas.drawRect(0f, 165f, pageW, 169f, Paint().apply { color = 0xFF0284C7.toInt() })
+            if (pi == 0) {
+                canvas.drawText("💰 تقرير المدفوعات - $user", pageW / 2f, 55f, titlePaint)
+                canvas.drawText("$brName | $periodName", pageW / 2f, 88f, subPaint)
+                canvas.drawText("التاريخ: $today | عدد الدفعات: ${rows.size}", pageW / 2f, 114f, smallPaint)
+                canvas.drawText("الإجمالي الكلي: ${numFmt.format(total)} د.ع", pageW / 2f, 148f, totalPaint)
+                canvas.drawRect(0f, 165f, pageW, 169f, Paint().apply { color = 0xFF0284C7.toInt() })
+            } else {
+                canvas.drawText("💰 تقرير المدفوعات - $user (تابع)", pageW / 2f, 55f, subPaint)
+            }
 
-            // بطاقة الرقم الواحد - كل حقل في سطر مستقل مع التفاف النص الطويل
-            val rightX = pageW - 60f
-            val maxW = pageW - 230f
-            var y = 220f
-            canvas.drawText("الرقم ${i + 1} من ${rows.size}", pageW - 60f, y, Paint().apply { color = 0xFF999999.toInt(); textSize = 15f; textAlign = Paint.Align.RIGHT })
+            // رأس الجدول
+            canvas.drawRect(leftEdge, headerTop, rightEdge, headerTop + headerH, headBg)
+            cols.forEachIndexed { i, c ->
+                val cx = (colRights[i] + (colRights[i] - c.w)) / 2f
+                canvas.drawText(c.title, cx, headerTop + 25f, headPaint)
+            }
 
-            y += 55f
-            canvas.drawText("المشترك", rightX, y, labelPaint)
-            y += 34f
-            y = drawWrapped(canvas, valuePaint, s.name.ifEmpty { "-" }, rightX, y, maxW, 30f)
-            y += 20f
-            canvas.drawRect(60f, y - 14f, pageW - 60f, y - 12f, Paint().apply { color = 0xFFE5E7EB.toInt() })
-            y += 28f
+            var rowY = top
+            pageRows.forEachIndexed { ri, s ->
+                val h = rowHeight(s)
+                val rowTop = rowY
+                if (ri % 2 == 1) canvas.drawRect(leftEdge, rowTop, rightEdge, rowTop + h, altBg)
+                canvas.drawText((globalIdx + 1).toString(), (colRights[0] + colRights[0] - cols[0].w) / 2f, rowTop + 24f, seqPaint)
+                drawWrapped(canvas, cellPaint, s.name.ifEmpty { "-" }, colRights[1] - 10f, rowTop + 24f, cols[1].w - 20f, lineH)
+                drawWrapped(canvas, cellPaint, s.meter.ifEmpty { "-" }, colRights[2] - 10f, rowTop + 24f, cols[2].w - 20f, lineH)
+                drawWrapped(canvas, cellPaint, s.latestDate.ifEmpty { "-" }, colRights[3] - 10f, rowTop + 24f, cols[3].w - 20f, lineH)
+                drawWrapped(canvas, cellPaint, s.note.ifEmpty { "-" }, colRights[4] - 10f, rowTop + 24f, cols[4].w - 20f, lineH)
+                canvas.drawText(numFmt.format(s.total), colRights[5] - 10f, rowTop + 24f, cellNumPaint)
+                globalIdx++
+                rowY += h
+            }
 
-            canvas.drawText("رقم العداد", rightX, y, labelPaint)
-            y += 34f
-            y = drawWrapped(canvas, valuePaint, s.meter.ifEmpty { "-" }, rightX, y, maxW, 30f)
-            y += 20f
-            canvas.drawRect(60f, y - 14f, pageW - 60f, y - 12f, Paint().apply { color = 0xFFE5E7EB.toInt() })
-            y += 28f
-
-            canvas.drawText("آخر تاريخ", rightX, y, labelPaint)
-            y += 34f
-            y = drawWrapped(canvas, valuePaint, s.latestDate.ifEmpty { "-" }, rightX, y, maxW, 30f)
-            y += 20f
-            canvas.drawRect(60f, y - 14f, pageW - 60f, y - 12f, Paint().apply { color = 0xFFE5E7EB.toInt() })
-            y += 28f
-
-            canvas.drawText("الملاحظة", rightX, y, labelPaint)
-            y += 34f
-            y = drawWrapped(canvas, valuePaint, s.note.ifEmpty { "-" }, rightX, y, maxW, 30f)
-            y += 20f
-            canvas.drawRect(60f, y - 14f, pageW - 60f, y - 12f, Paint().apply { color = 0xFFE5E7EB.toInt() })
-            y += 40f
-
-            canvas.drawText("المبلغ:", rightX, y, labelPaint)
-            canvas.drawText("${numFmt.format(s.total)} د.ع", rightX, y + 52f, numPaint)
-
-            canvas.drawText("صفحة ${i + 1} / ${rows.size}", pageW / 2f, pageH - 40f, smallPaint)
+            canvas.drawText("صفحة ${pi + 1} / ${pages.size}", pageW / 2f, pageH - 30f, smallPaint)
             doc.finishPage(page)
         }
 
