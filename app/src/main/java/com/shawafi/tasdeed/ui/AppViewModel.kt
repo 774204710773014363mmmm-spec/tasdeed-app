@@ -54,6 +54,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val pendingFreePayments = MutableStateFlow<MutableList<FreePayment>>(loadPendingList("pending_free_payments"))
     val freePayments = MutableStateFlow<List<FreePayment>>(emptyList())
     val isOnline = MutableStateFlow(true)
+    // مفاتيح الكشوف المحذوفة (سحابياً) لمنع عودتها لأي جهاز: "name|createdAt"
+    val deletedKeys = MutableStateFlow<Set<String>>(emptySet())
 
     private var lockJob: Job? = null
     private var frameJob: Job? = null
@@ -611,6 +613,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val res = withContext(Dispatchers.IO) {
                 try { repo.fetchArchive(bk) } catch (e: Exception) { null }
             } ?: return@launch
+            val deleted = withContext(Dispatchers.IO) {
+                try { repo.fetchArchiveDeleted(bk) } catch (e: Exception) { emptySet() }
+            }
+            deletedKeys.value = deleted
             val (cloudCur, cloudPeriods) = res
             var changed = false
             val curIds = currentPayments.value.map { it.localId }.toSet()
@@ -620,7 +626,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 changed = true
             }
             val lp = periods.value.toMutableList()
+            // إزالة الكشوف المحذوفة سحابياً من المحلي (حتى لا تعود لأي جهاز)
+            val beforeDel = lp.size
+            lp.removeAll { "${it.name}|${it.createdAt}" in deleted }
+            if (lp.size != beforeDel) changed = true
             cloudPeriods.forEach { cp ->
+                if ("${cp.name}|${cp.createdAt}" in deleted) return@forEach
                 val idx = lp.indexOfFirst { it.name == cp.name && it.createdAt == cp.createdAt }
                 if (idx >= 0) {
                     val ids = lp[idx].payments.map { it.localId }.toSet()
@@ -683,12 +694,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun deletePeriod(idx: Int) {
         if (idx in periods.value.indices) {
+            val target = periods.value[idx]
+            val key = "${target.name}|${target.createdAt}"
             val list = periods.value.toMutableList()
             list.removeAt(idx)
             periods.value = list
             store.savePeriods(list)
             pushArchiveCloud()
-            toast("تم حذف الكشف")
+            deletedKeys.value = deletedKeys.value + key
+            val bk = branchKey.value
+            if (bk != null) {
+                viewModelScope.launch {
+                    withContext(Dispatchers.IO) {
+                        try { repo.pushArchiveDeleted(bk, deletedKeys.value.toList()) } catch (e: Exception) {}
+                    }
+                }
+            }
+            toast("تم حذف الكشف من السحابة أيضاً")
         }
     }
 
