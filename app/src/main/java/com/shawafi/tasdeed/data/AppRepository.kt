@@ -294,6 +294,24 @@ class AppRepository(val store: LocalStore) {
         return FirebaseClient.put("${FirebaseClient.ROOT}/archive/$branch", payload)
     }
 
+    fun pushArchiveDeleted(branch: String, deletedKeys: List<String>): Boolean {
+        val payload = JSONObject()
+        val arr = JSONArray()
+        deletedKeys.forEach { arr.put(it) }
+        payload.put("keys", arr)
+        payload.put("updated_at", System.currentTimeMillis())
+        return FirebaseClient.put("${FirebaseClient.ROOT}/archive/$branch/deleted", payload)
+    }
+
+    fun fetchArchiveDeleted(branch: String): Set<String> {
+        val o = FirebaseClient.get("${FirebaseClient.ROOT}/archive/$branch/deleted") ?: return emptySet()
+        val out = mutableSetOf<String>()
+        o.optJSONArray("keys")?.let { arr ->
+            for (i in 0 until arr.length()) out.add(arr.optString(i))
+        }
+        return out
+    }
+
     private fun bumpCacheVersion() {
         val payload = JSONObject()
         payload.put("cache_version", System.currentTimeMillis())
