@@ -39,6 +39,8 @@ jobs:
           gradle assembleDebug --no-daemon --build-cache
 
       - name: Upload APK to Release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete tasdeed-latest --yes --repo ${{ github.repository }} || true
           gh release create tasdeed-latest --repo ${{ github.repository }} --title "تسديد نقي" --notes "النسخة الأخيرة" app/build/outputs/apk/debug/*.apk
