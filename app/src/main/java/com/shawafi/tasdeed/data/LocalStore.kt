@@ -43,10 +43,36 @@ class LocalStore(context: Context) {
         putString(key, obj.toString())
     }
 
-    fun savePayments(list: List<PaymentRecord>) {
+    private fun keyFor(base: String, branch: String?): String =
+        if (branch.isNullOrBlank()) base else "${base}_${branch}"
+
+    // ترحيل البيانات القديمة (المفتاح العام) إلى فرع واحد عند أول دخول به بعد الترقية
+    private fun migrateLegacy(base: String, branch: String?): JSONArray? {
+        if (branch.isNullOrBlank()) return getJsonArray(base)
+        val legacy = getJsonArray(base) ?: return null
+        val branchKey = keyFor(base, branch)
+        if (getJsonArray(branchKey) != null) return null
+        var allMatch = true
+        for (i in 0 until legacy.length()) {
+            val o = legacy.optJSONObject(i) ?: continue
+            val pays = o.optJSONArray("payments") ?: continue
+            for (j in 0 until pays.length()) {
+                val po = pays.optJSONObject(j) ?: continue
+                val b = po.optString("branch")
+                if (b.isNotBlank() && b != branch) { allMatch = false; break }
+            }
+            if (!allMatch) break
+        }
+        if (!allMatch) return null
+        putJson(branchKey, legacy)
+        remove(base)
+        return legacy
+    }
+
+    fun savePayments(list: List<PaymentRecord>, branch: String? = null) {
         val arr = JSONArray()
         list.forEach { arr.put(it.toJson()) }
-        putJson("archive_payments", arr)
+        putJson(keyFor("archive_payments", branch), arr)
     }
 
     fun loadMyPayments(): MutableList<PaymentRecord> {
@@ -101,17 +127,17 @@ class LocalStore(context: Context) {
         return out
     }
 
-    fun loadPayments(): MutableList<PaymentRecord> {
+    fun loadPayments(branch: String? = null): MutableList<PaymentRecord> {
         val out = mutableListOf<PaymentRecord>()
-        getJsonArray("archive_payments")?.let { arr ->
-            for (i in 0 until arr.length()) {
-                arr.optJSONObject(i)?.let { out.add(PaymentRecord.from(it)) }
-            }
+        val arr = getJsonArray(keyFor("archive_payments", branch))
+            ?: migrateLegacy("archive_payments", branch) ?: return out
+        for (i in 0 until arr.length()) {
+            arr.optJSONObject(i)?.let { out.add(PaymentRecord.from(it)) }
         }
         return out
     }
 
-    fun savePeriods(periods: List<Period>) {
+    fun savePeriods(periods: List<Period>, branch: String? = null) {
         val arr = JSONArray()
         periods.forEach { p ->
             val o = JSONObject()
@@ -123,26 +149,26 @@ class LocalStore(context: Context) {
             o.put("payments", pays)
             arr.put(o)
         }
-        putJson("archive_periods", arr)
+        putJson(keyFor("archive_periods", branch), arr)
     }
 
-    fun loadPeriods(): MutableList<Period> {
+    fun loadPeriods(branch: String? = null): MutableList<Period> {
         val out = mutableListOf<Period>()
-        getJsonArray("archive_periods")?.let { arr ->
-            for (i in 0 until arr.length()) {
-                val o = arr.optJSONObject(i) ?: continue
-                val p = Period(
-                    name = o.optString("name"),
-                    createdAt = o.optString("created_at"),
-                    closedAt = o.optLong("closed_at", System.currentTimeMillis())
-                )
-                o.optJSONArray("payments")?.let { pays ->
-                    for (j in 0 until pays.length()) {
-                        pays.optJSONObject(j)?.let { p.payments.add(PaymentRecord.from(it)) }
-                    }
+        val arr = getJsonArray(keyFor("archive_periods", branch))
+            ?: migrateLegacy("archive_periods", branch) ?: return out
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val p = Period(
+                name = o.optString("name"),
+                createdAt = o.optString("created_at"),
+                closedAt = o.optLong("closed_at", System.currentTimeMillis())
+            )
+            o.optJSONArray("payments")?.let { pays ->
+                for (j in 0 until pays.length()) {
+                    pays.optJSONObject(j)?.let { p.payments.add(PaymentRecord.from(it)) }
                 }
-                out.add(p)
             }
+            out.add(p)
         }
         return out
     }
