@@ -188,6 +188,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 branchName.value = b.name
                 isLoggedIn.value = true
                 reloadSubscribers()
+                loadBranchArchive(k)
                 startLocksLoop()
                 if (usedNetwork) {
                     fetchFreePayments()
@@ -211,6 +212,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toast(text: String, isError: Boolean = false) {
         message.value = ToastMsg(text, isError)
+    }
+
+    // حفظ الأرشيف المحلي بمفتاح خاص لكل فرع (يمنع خلط كشوف الفروع مع بعضها)
+    private fun saveBranchArchive() {
+        store.savePeriods(periods.value, branchKey.value)
+        store.savePayments(currentPayments.value, branchKey.value)
+    }
+
+    // تحميل كشوفات الفرع الحالي من المخزن المحلي (يستبدل قوائم الفرع السابق)
+    private fun loadBranchArchive(branch: String) {
+        currentPayments.value = store.loadPayments(branch).toMutableList()
+        periods.value = store.loadPeriods(branch).toMutableList()
     }
 
     fun clearToast() {
@@ -253,6 +266,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         store.remove("saved_user"); store.remove("saved_pass"); store.remove("remember_me")
                     }
                     reloadSubscribers()
+                    loadBranchArchive(k)
                     startLocksLoop()
                     if (useNetwork) fetchFreePayments()
                     if (useNetwork) fetchArchiveFromCloud()
@@ -519,7 +533,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 val kept = periods.value[idx].payments.filterNot { it.localId in ids }
                 periods.value[idx].payments.clear()
                 periods.value[idx].payments.addAll(kept)
-                store.savePeriods(periods.value)
+                saveBranchArchive()
                 pushArchiveCloud()
             }
         }
@@ -647,8 +661,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
             if (changed) {
                 periods.value = lp
-                store.savePayments(currentPayments.value)
-                store.savePeriods(periods.value)
+                saveBranchArchive()
                 withContext(Dispatchers.IO) {
                     try { repo.pushArchive(bk, currentPayments.value, periods.value) } catch (e: Exception) {}
                 }
@@ -665,7 +678,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val idx = record.periodIdx
         if (idx != null && idx in periods.value.indices) {
             periods.value[idx].payments.add(record)
-            store.savePeriods(periods.value)
+            saveBranchArchive()
             pushArchiveCloud()
         }
     }
@@ -678,7 +691,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             closedAt = System.currentTimeMillis()
         )
         periods.value = (periods.value + p).toMutableList()
-        store.savePeriods(periods.value)
+        saveBranchArchive()
         pushArchiveCloud()
         toast("✅ تم فتح كشف جديد: $name")
     }
@@ -687,7 +700,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (idx in periods.value.indices) {
             periods.value[idx].payments.clear()
             periods.value[idx].payments.addAll(list)
-            store.savePeriods(periods.value)
+            saveBranchArchive()
         }
         pushArchiveCloud()
     }
@@ -699,7 +712,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val list = periods.value.toMutableList()
             list.removeAt(idx)
             periods.value = list
-            store.savePeriods(list)
+            store.savePeriods(list, branchKey.value)
             pushArchiveCloud()
             deletedKeys.value = deletedKeys.value + key
             val bk = branchKey.value
@@ -719,7 +732,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             val list = periods.value.toMutableList()
             list[idx] = list[idx].copy(name = newName.trim())
             periods.value = list
-            store.savePeriods(list)
+            store.savePeriods(list, branchKey.value)
             pushArchiveCloud()
             toast("✅ تم تعديل الاسم")
         }
