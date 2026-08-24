@@ -91,7 +91,9 @@ fun AdminStatementScreen(
     var dlOpen by remember { mutableStateOf(false) }
     var shOpen by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<ReportExporter.SubGroup?>(null) }
-    var subEdits by remember { mutableStateOf<MutableMap<String, Double>>(mutableMapOf()) }
+    var subEdits by remember { mutableStateOf<MutableMap<String, String>>(mutableMapOf()) }
+    val amountRegex = Regex("\\d*\\.?\\d*")
+    fun plainNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
 
     val savePdf = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -296,8 +298,8 @@ fun AdminStatementScreen(
                             itemsIndexed(subPays, key = { _, p -> p.localId }) { _, p ->
                                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     OutlinedTextField(
-                                        value = subEdits[p.localId]?.let { formatNum(it) } ?: formatNum(p.amount),
-                                        onValueChange = { subEdits[p.localId] = it.toDoubleOrNull() ?: 0.0 },
+                                        value = subEdits[p.localId] ?: plainNum(p.amount),
+                                        onValueChange = { if (it.matches(amountRegex)) subEdits[p.localId] = it },
                                         singleLine = true,
                                         modifier = Modifier.width(110.dp),
                                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, textAlign = TextAlign.Center)
@@ -328,8 +330,8 @@ fun AdminStatementScreen(
                         Button(
                             onClick = {
                                 val edited = subPays.mapNotNull { p ->
-                                    val amt = subEdits[p.localId] ?: p.amount
-                                    if (amt > 0) p.copy(amount = amt) else null
+                                    val amt = subEdits[p.localId]?.toDoubleOrNull() ?: p.amount
+                                    p.copy(amount = if (amt > 0) amt else p.amount)
                                 }
                                 val editedIds = edited.map { it.localId }.toSet()
                                 items = items.map { p ->
