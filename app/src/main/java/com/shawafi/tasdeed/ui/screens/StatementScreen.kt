@@ -103,9 +103,13 @@ fun StatementScreen(
     var shOpen by remember { mutableStateOf(false) }
     var sortOpen by remember { mutableStateOf(false) }
     var editMode by remember { mutableStateOf(false) }
-    var editedAmounts by remember { mutableStateOf<MutableMap<String, Double>>(mutableMapOf()) }
+    var editedAmounts by remember { mutableStateOf<MutableMap<String, String>>(mutableMapOf()) }
     var editTarget by remember { mutableStateOf<ReportExporter.SubGroup?>(null) }
-    var subEdits by remember { mutableStateOf<MutableMap<String, Double>>(mutableMapOf()) }
+    var subEdits by remember { mutableStateOf<MutableMap<String, String>>(mutableMapOf()) }
+    val amountRegex = Regex("\\d*\\.?\\d*")
+    fun plainNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
+    fun parseEdits(m: Map<String, String>): Map<String, Double> =
+        m.mapNotNull { (k, v) -> v.toDoubleOrNull()?.takeIf { it > 0 }?.let { k to it } }.toMap()
 
     fun shareFile(file: File) {
         val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
@@ -307,8 +311,8 @@ fun StatementScreen(
                     itemsIndexed(raw, key = { _, p -> p.localId }) { _, p ->
                         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(
-                                value = editedAmounts[p.localId]?.let { formatNum(it) } ?: formatNum(p.amount),
-                                onValueChange = { editedAmounts[p.localId] = it.toDoubleOrNull() ?: 0.0 },
+                                value = editedAmounts[p.localId] ?: plainNum(p.amount),
+                                onValueChange = { if (it.matches(amountRegex)) editedAmounts[p.localId] = it },
                                 singleLine = true,
                                 modifier = Modifier.width(110.dp),
                                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, textAlign = TextAlign.Center)
@@ -320,7 +324,7 @@ fun StatementScreen(
                         HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
                     }
                 }
-                Text("💾 الإجمالي: ${formatNum(editedAmounts.values.sum())} د.ع", fontSize = 13.sp, color = Green, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                Text("💾 الإجمالي: ${formatNum(raw.sumOf { p -> editedAmounts[p.localId]?.toDoubleOrNull() ?: p.amount })} د.ع", fontSize = 13.sp, color = Green, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
             }
         }
 
@@ -346,8 +350,10 @@ fun StatementScreen(
                 OutlinedButton(onClick = { editMode = false }, modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
                 Button(
                     onClick = {
-                        if (isMy) vm.saveEditedMyPeriod(idx, editedAmounts.keys.toSet(), editedAmounts)
-                        else vm.saveEditedPeriod(idx, editedAmounts.keys.toSet(), editedAmounts)
+                        val parsed = parseEdits(editedAmounts)
+                        if (isMy) vm.saveEditedMyPeriod(idx, parsed.keys.toSet(), parsed)
+                        else vm.saveEditedPeriod(idx, parsed.keys.toSet(), parsed)
+                        editedAmounts.clear()
                         editMode = false
                     },
                     modifier = Modifier.weight(1f).height(46.dp),
@@ -386,8 +392,8 @@ fun StatementScreen(
                             itemsIndexed(subPays, key = { _, p -> p.localId }) { _, p ->
                                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                     OutlinedTextField(
-                                        value = subEdits[p.localId]?.let { formatNum(it) } ?: formatNum(p.amount),
-                                        onValueChange = { subEdits[p.localId] = it.toDoubleOrNull() ?: 0.0 },
+                                        value = subEdits[p.localId] ?: plainNum(p.amount),
+                                        onValueChange = { if (it.matches(amountRegex)) subEdits[p.localId] = it },
                                         singleLine = true,
                                         modifier = Modifier.width(110.dp),
                                         textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, textAlign = TextAlign.Center)
@@ -413,8 +419,10 @@ fun StatementScreen(
                         OutlinedButton(onClick = { editTarget = null }, modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
                         Button(
                             onClick = {
-                                if (isMy) vm.saveEditedMyPeriod(idx, subEdits.keys.toSet(), subEdits)
-                                else vm.saveEditedPeriod(idx, subEdits.keys.toSet(), subEdits)
+                                val parsed = parseEdits(subEdits)
+                                if (isMy) vm.saveEditedMyPeriod(idx, parsed.keys.toSet(), parsed)
+                                else vm.saveEditedPeriod(idx, parsed.keys.toSet(), parsed)
+                                subEdits.clear()
                                 editTarget = null
                             },
                             modifier = Modifier.weight(1f).height(46.dp),
