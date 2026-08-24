@@ -503,19 +503,20 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveEditedMyPeriod(idx: Int, editedIds: Set<String>, newAmounts: Map<String, Double>) {
         if (idx !in myPeriods.value.indices) return
-        val list = myPeriods.value[idx].payments.toMutableList()
+        val list = myPeriods.value[idx].payments
         val newList = mutableListOf<PaymentRecord>()
         list.forEach { pay ->
             if (pay.localId in editedIds) {
                 val amt = newAmounts[pay.localId] ?: pay.amount
-                if (amt > 0) newList.add(pay.copy(amount = amt))
+                newList.add(pay.copy(amount = if (amt > 0) amt else pay.amount))
             } else {
                 newList.add(pay)
             }
         }
-        myPeriods.value[idx].payments.clear()
-        myPeriods.value[idx].payments.addAll(newList)
-        store.saveMyPeriods(myPeriods.value)
+        val lp = myPeriods.value.toMutableList()
+        lp[idx] = lp[idx].copy(payments = newList)
+        myPeriods.value = lp
+        store.saveMyPeriods(lp)
         toast("✅ تم حفظ التعديلات")
     }
 
@@ -524,15 +525,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (isMy) {
             if (idx in myPeriods.value.indices) {
                 val kept = myPeriods.value[idx].payments.filterNot { it.localId in ids }
-                myPeriods.value[idx].payments.clear()
-                myPeriods.value[idx].payments.addAll(kept)
-                store.saveMyPeriods(myPeriods.value)
+                val lp = myPeriods.value.toMutableList()
+                lp[idx] = lp[idx].copy(payments = kept.toMutableList())
+                myPeriods.value = lp
+                store.saveMyPeriods(lp)
             }
         } else {
             if (idx in periods.value.indices) {
                 val kept = periods.value[idx].payments.filterNot { it.localId in ids }
-                periods.value[idx].payments.clear()
-                periods.value[idx].payments.addAll(kept)
+                val lp = periods.value.toMutableList()
+                lp[idx] = lp[idx].copy(payments = kept.toMutableList())
+                periods.value = lp
                 saveBranchArchive()
                 pushArchiveCloud()
             }
@@ -698,8 +701,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun savePeriodData(idx: Int, list: List<PaymentRecord>) {
         if (idx in periods.value.indices) {
-            periods.value[idx].payments.clear()
-            periods.value[idx].payments.addAll(list)
+            val lp = periods.value.toMutableList()
+            lp[idx] = lp[idx].copy(payments = list.toMutableList())
+            periods.value = lp
             saveBranchArchive()
         }
         pushArchiveCloud()
@@ -740,12 +744,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun saveEditedPeriod(idx: Int, editedIds: Set<String>, newAmounts: Map<String, Double>) {
         if (idx !in periods.value.indices) return
-        val list = periods.value[idx].payments.toMutableList()
+        val list = periods.value[idx].payments
         val newList = mutableListOf<PaymentRecord>()
         list.forEach { pay ->
             if (pay.localId in editedIds) {
                 val amt = newAmounts[pay.localId] ?: pay.amount
-                if (amt > 0) newList.add(pay.copy(amount = amt))
+                newList.add(pay.copy(amount = if (amt > 0) amt else pay.amount))
             } else {
                 newList.add(pay)
             }
