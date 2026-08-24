@@ -309,7 +309,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** إجمالي المسدد لكل مشترك من أرشيف سحابة التطبيق (كل الفروع) — لشاشة إدارة المشتركين */
-    val paidTotals = mutableStateOf<Map<String, Double>>(emptyMap())
+    val paidTotals = MutableStateFlow<Map<String, Double>>(emptyMap())
 
     private fun loadPaidTotals() {
         viewModelScope.launch {
