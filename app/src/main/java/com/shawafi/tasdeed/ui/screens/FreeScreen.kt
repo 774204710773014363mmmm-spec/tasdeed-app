@@ -82,7 +82,7 @@ fun FreeScreen(
             else vm.toast("❌ فشل حفظ الملف", true)
         }
     }
-    val saveExcel = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.ms-excel")) { uri: Uri? ->
+    val saveExcel = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             exporting = true
@@ -104,7 +104,7 @@ fun FreeScreen(
     fun shareFile(file: File) {
         val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = if (file.extension == "pdf") "application/pdf" else "application/vnd.ms-excel"
+            type = if (file.extension == "pdf") "application/pdf" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -227,7 +227,7 @@ fun FreeScreen(
                 )
                 ListItem(
                     headlineContent = { Text("📊 مشاركة Excel") },
-                    modifier = Modifier.clickable { shOpen = false; doShare("xls") }
+                    modifier = Modifier.clickable { shOpen = false; doShare("xlsx") }
                 )
             }
         }
@@ -246,7 +246,7 @@ fun FreeScreen(
                 ListItem(
                     headlineContent = { Text("📊 تنزيل Excel") },
                     supportingContent = { Text("حفظ في الجوال (اختر المكان)") },
-                    modifier = Modifier.clickable { dlOpen = false; saveExcel.launch("حساباتي.xls") }
+                    modifier = Modifier.clickable { dlOpen = false; saveExcel.launch("حساباتي.xlsx") }
                 )
             }
         }
