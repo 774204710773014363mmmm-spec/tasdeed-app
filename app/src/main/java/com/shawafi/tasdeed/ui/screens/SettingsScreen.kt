@@ -49,6 +49,7 @@ fun SettingsScreen(
     var devPassOpen by remember { mutableStateOf(false) }
     var devPass by remember { mutableStateOf("") }
     var devPassHidden by remember { mutableStateOf(true) }
+    var resetPaidOpen by remember { mutableStateOf(false) }
     val context = LocalContext.current
 
     Column(modifier = modifier.padding(padding)) {
@@ -221,6 +222,17 @@ fun SettingsScreen(
                             }
                         }
                     )
+                    if (devMode) {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { resetPaidOpen = true },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                            modifier = Modifier.fillMaxWidth().height(46.dp)
+                        ) {
+                            Text("🗑️ حذف المبالغ المسددة (بداية شهر جديد)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 }
             }
 
@@ -243,6 +255,39 @@ fun SettingsScreen(
     }
 
     // نافذة كلمة مرور وضع المطور (تفعيل محلي على هذا الجهاز فقط)
+    if (resetPaidOpen) {
+        Dialog(onDismissRequest = { resetPaidOpen = false }) {
+            Surface(shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("🗑️ تصفير المبالغ المسددة", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "ستبدأ إحصاءات «المسدد» من صفر (بداية شهر جديد).\nالكشوفات والدفعات المحفوظة في الأرشيف لن تُمس.",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                    Spacer(Modifier.height(14.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(
+                            onClick = { resetPaidOpen = false },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f).height(46.dp)
+                        ) { Text("إلغاء") }
+                        Button(
+                            onClick = {
+                                resetPaidOpen = false
+                                vm.resetPaidTotals()
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626)),
+                            modifier = Modifier.weight(1f).height(46.dp)
+                        ) { Text("تصفير", color = Color.White, fontWeight = FontWeight.Bold) }
+                    }
+                }
+            }
+        }
+    }
+
     if (devPassOpen) {
         Dialog(onDismissRequest = { devPassOpen = false; devPass = "" }) {
             Surface(shape = RoundedCornerShape(20.dp)) {
