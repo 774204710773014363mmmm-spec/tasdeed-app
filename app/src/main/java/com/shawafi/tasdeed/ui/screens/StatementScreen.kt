@@ -103,9 +103,9 @@ fun StatementScreen(
     var shOpen by remember { mutableStateOf(false) }
     var sortOpen by remember { mutableStateOf(false) }
     var editMode by remember { mutableStateOf(false) }
-    var editedAmounts by remember { mutableStateOf<MutableMap<String, String>>(mutableMapOf()) }
+    val editedAmounts = remember { mutableStateMapOf<String, String>() }
     var editTarget by remember { mutableStateOf<ReportExporter.SubGroup?>(null) }
-    var subEdits by remember { mutableStateOf<MutableMap<String, String>>(mutableMapOf()) }
+    val subEdits = remember { mutableStateMapOf<String, String>() }
     val amountRegex = Regex("\\d*\\.?\\d*")
     fun plainNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
     fun parseEdits(m: Map<String, String>): Map<String, Double> =
@@ -114,7 +114,7 @@ fun StatementScreen(
     fun shareFile(file: File) {
         val uri = FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = if (file.extension == "pdf") "application/pdf" else "application/vnd.ms-excel"
+            type = if (file.extension == "pdf") "application/pdf" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -162,7 +162,7 @@ fun StatementScreen(
         }
     }
 
-    val saveExcel = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.ms-excel")) { uri: Uri? ->
+    val saveExcel = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             exporting = true
@@ -183,7 +183,7 @@ fun StatementScreen(
 
     fun doDownload(ext: String) {
         if (ext == "pdf") savePdf.launch("كشف_${name.replace(" ", "_").replace("/", "_")}.pdf")
-        else saveExcel.launch("كشف_${name.replace(" ", "_").replace("/", "_")}.xls")
+        else saveExcel.launch("كشف_${name.replace(" ", "_").replace("/", "_")}.xlsx")
     }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
@@ -239,7 +239,7 @@ fun StatementScreen(
                     ListItem(
                         headlineContent = { Text("📊 تنزيل Excel") },
                         supportingContent = { Text("حفظ في الجوال (اختر المكان)") },
-                        modifier = Modifier.clickable { dlOpen = false; doDownload("xls") }
+                        modifier = Modifier.clickable { dlOpen = false; doDownload("xlsx") }
                     )
                 }
             }
@@ -256,7 +256,7 @@ fun StatementScreen(
                     )
                     ListItem(
                         headlineContent = { Text("📊 مشاركة Excel") },
-                        modifier = Modifier.clickable { shOpen = false; doShare("xls") }
+                        modifier = Modifier.clickable { shOpen = false; doShare("xlsx") }
                     )
                 }
             }
