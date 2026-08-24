@@ -305,6 +305,32 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 applySubscriberFilter()
             }
         }
+        loadPaidTotals()
+    }
+
+    /** إجمالي المسدد لكل مشترك من أرشيف سحابة التطبيق (كل الفروع) — لشاشة إدارة المشتركين */
+    val paidTotals = mutableStateOf<Map<String, Double>>(emptyMap())
+
+    private fun loadPaidTotals() {
+        viewModelScope.launch {
+            val m = withContext(Dispatchers.IO) {
+                try { repo.fetchPaidTotals() } catch (e: Exception) { emptyMap() }
+            }
+            paidTotals.value = m
+        }
+    }
+
+    /** تصفير المبالغ المسددة (بداية شهر جديد) — الأرشيف لا يُمس، فقط يبدأ الاحتساب من الآن */
+    fun resetPaidTotals() {
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) { repo.resetPaidTotals() }
+            if (ok) {
+                paidTotals.value = emptyMap()
+                toast("🗑️ تم تصفير المبالغ المسددة — بداية شهر جديد")
+            } else {
+                toast("تعذرت المزامنة مع السحابة (تحقق من النت)", true)
+            }
+        }
     }
 
     /** فلترة المشتركين: المخفيون (hidden) يظهرون فقط لجهاز المطور */
