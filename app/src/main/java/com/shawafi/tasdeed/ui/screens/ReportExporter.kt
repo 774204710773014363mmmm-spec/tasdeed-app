@@ -4,12 +4,9 @@ import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import com.shawafi.tasdeed.data.PaymentRecord
 import com.shawafi.tasdeed.ui.AppViewModel
-import java.io.ByteArrayOutputStream
 import java.io.OutputStream
 import java.text.NumberFormat
 import java.util.Locale
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
 object ReportExporter {
 
@@ -262,63 +259,7 @@ object ReportExporter {
         sb.append("</ss:Worksheet>\n")
         sb.append("</ss:Workbook>\n")
 
-        out.write(buildXlsx(sb.toString()).toByteArray(Charsets.UTF_8))
-    }
-
-    private fun buildXlsx(xmlBody: String): String {
-        val sheetXml = xmlBody
-        val contentTypes = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
-<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-</Types>"""
-        val rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-</Relationships>"""
-        val workbook = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
- xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-<sheets><sheet name="المدفوعات" sheetId="1" r:id="rId1"/></sheets>
-</workbook>"""
-        val xlRels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-</Relationships>"""
-        val styles = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="1"><numFmt numFmtId="164" formatCode="#,##0"/></numFmts>
-<fonts count="3"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font></fonts>
-<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF059669"/></patternFill></fill></fills>
-<borders count="1"><border><left/><right/><top/><bottom/></border></borders>
-<cellStyleXfs count="1"><xf/></cellStyleXfs>
-<cellXfs count="5">
-<xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
-<xf numFmtId="0" fontId="1" fillId="2" borderId="0" applyFont="1" applyFill="1" alignment="horizontal="center" readingOrder="2"/>
-<xf numFmtId="0" fontId="2" fillId="0" borderId="0" applyFont="1" alignment="horizontal="center" readingOrder="2"/>
-<xf numFmtId="164" fontId="0" fillId="0" borderId="0" applyNumberFormat="1" alignment="horizontal="center" readingOrder="2"/>
-<xf numFmtId="0" fontId="0" fillId="0" borderId="0" alignment="horizontal="center" readingOrder="2"/>
-</cellXfs>
-</styleSheet>"""
-        val baos = ByteArrayOutputStream()
-        ZipOutputStream(baos).use { zos ->
-            fun put(name: String, content: String) {
-                zos.putNextEntry(ZipEntry(name))
-                zos.write(content.toByteArray(Charsets.UTF_8))
-                zos.closeEntry()
-            }
-            put("[Content_Types].xml", contentTypes)
-            put("_rels/.rels", rels)
-            put("xl/workbook.xml", workbook)
-            put("xl/_rels/workbook.xml.rels", xlRels)
-            put("xl/styles.xml", styles)
-            put("xl/worksheets/sheet1.xml", sheetXml)
-        }
-        return baos.toString("UTF-8")
+        out.write(sb.toString().toByteArray(Charsets.UTF_8))
     }
 
     data class SubGroup(
