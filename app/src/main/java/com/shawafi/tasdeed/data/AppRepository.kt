@@ -116,6 +116,8 @@ class AppRepository(val store: LocalStore) {
             root.optJSONObject(k)?.let { Subscriber.from(k, it) }?.let { map[k] = it }
         }
         subscribersCache = filterSubscribers(map.filterValues { it.syncKey == FirebaseClient.SYNC_KEY })
+        // أعلام الإخفاء من العقدة المستقلة — تُطبق بعد كل جلب فلا ترجع الإخفاءات أبداً
+        subscribersCache = applyCloudFlags(subscribersCache)
         saveLocalSubscribers(subscribersCache)
         return subscribersCache
     }
@@ -126,7 +128,8 @@ class AppRepository(val store: LocalStore) {
         return AppConfig.from(o ?: store.getJsonObject("app_config"))
     }
 
-    /** تحديث علامات الرؤية للمشترك (إخفاء عن الفروع / إخفاء المبالغ) في السحابة والمخبأ المحلي */
+    /** تحديث علامات الرؤية للمشترك (إخفاء عن الفروع / إخفاء المبالغ) — العقدة المستقلة subscriber_flags
+     *  هي المرجع الدائم: مزامنة المكتبي (التي تكتب subscribers بدون أعلام) لا تستطيع مسحها أبداً */
     fun updateSubscriberVisibility(key: String, hidden: Boolean?, hideAmounts: Boolean?): Boolean {
         val sub = subscribersCache[key] ?: return false
         val payload = JSONObject()
@@ -134,8 +137,10 @@ class AppRepository(val store: LocalStore) {
         hideAmounts?.let { payload.put("hide_amounts", if (it) 1 else 0) }
         if (payload.length() == 0) return false
         val ok = try {
-            FirebaseClient.update("${FirebaseClient.ROOT}/subscribers/$key", payload)
+            FirebaseClient.update("${FirebaseClient.ROOT}/subscriber_flags/${flagIdentity(sub.name, sub.meterNumber)}", payload)
         } catch (e: Exception) { false }
+        // توافق قديم: اكتب على سجل المشترك أيضاً (أفضل جهد، ليست ضرورية)
+        try { FirebaseClient.update("${FirebaseClient.ROOT}/subscribers/$key", payload) } catch (e: Exception) {}
         if (ok) {
             subscribersCache[key] = sub.copy(
                 hidden = hidden ?: sub.hidden,
@@ -143,6 +148,77 @@ class AppRepository(val store: LocalStore) {
             )
             saveLocalSubscribers(subscribersCache)
         }
+        return ok
+    }
+
+    /** هوية ثابتة للمشترك (الاسم|العداد) — مفاتيح فايربيس لا تقبل . $ # [ ] / */
+    private fun flagIdentity(name: String, meter: String): String =
+        (name.trim() + "|" + meter.trim()).replace(Regex("[.$#\\[\\]/]"), "_")
+
+    /** تطبيق أعلام الإخفاء من العقدة المستقلة بعد كل جلب للمشتركين — يلغي أثر مسح المكتبي/التكرارات */
+    private fun applyCloudFlags(map: MutableMap<String, Subscriber>): MutableMap<String, Subscriber> {
+        val raw = try { FirebaseClient.getRaw("${FirebaseClient.ROOT}/subscriber_flags") } catch (e: Exception) { null }
+            ?: return map
+        if (raw.isEmpty() || raw == "null" || raw == "{}") return map
+        val root = try { JSONObject(raw) } catch (e: Exception) { return map }
+        val out = map.toMutableMap()
+        out.keys.toList().forEach { k ->
+            val s = out[k] ?: return@forEach
+            val f = root.optJSONObject(flagIdentity(s.name, s.meterNumber)) ?: return@forEach
+            val nh = if (f.has("hidden")) f.optInt("hidden", 0) == 1 else s.hidden
+            val na = if (f.has("hide_amounts")) f.optInt("hide_amounts", 0) == 1 else s.hideAmounts
+            if (nh != s.hidden || na != s.hideAmounts) out[k] = s.copy(hidden = nh, hideAmounts = na)
+        }
+        return out
+    }
+
+    /** إجمالي المسدد لكل مشترك من سحابة تطبيق الجوال نفسها (أرشيف كل الفروع: الحالي + الكشوفات المغلقة)
+     *  مع احترام علامة التصفير: الدفعات الأقدم من reset_at لا تُحتسب (بداية شهر جديد) */
+    fun fetchPaidTotals(): Map<String, Double> {
+        val resetAt = try {
+            FirebaseClient.get("${FirebaseClient.ROOT}/paid_totals_reset")?.optLong("reset_at", 0L) ?: getPaidTotalsResetAt()
+        } catch (e: Exception) { getPaidTotalsResetAt() }
+        val out = mutableMapOf<String, Double>()
+        for (br in branchesCache.keys.toList()) {
+            val o = try { FirebaseClient.get("${FirebaseClient.ROOT}/archive/$br") } catch (e: Exception) { null } ?: continue
+            val deleted = mutableSetOf<String>()
+            o.optJSONObject("deleted")?.let { dobj ->
+                dobj.optJSONArray("keys")?.let { arr -> for (i in 0 until arr.length()) deleted.add(arr.optString(i)) }
+            }
+            fun addRecord(rec: JSONObject) {
+                val amt = rec.optDouble("amount", 0.0)
+                if (amt <= 0.0) return
+                if (resetAt > 0 && rec.optLong("created_at", 0L) < resetAt) return
+                val name = rec.optString("subscriber_name", "").trim().lowercase()
+                if (name.isEmpty()) return
+                out[name] = (out[name] ?: 0.0) + amt
+            }
+            o.optJSONArray("current")?.let { arr ->
+                for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { addRecord(it) }
+            }
+            o.optJSONArray("periods")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val po = arr.optJSONObject(i) ?: continue
+                    val pk = po.optString("name") + "|" + po.optString("created_at")
+                    if (pk in deleted) continue
+                    po.optJSONArray("payments")?.let { pays ->
+                        for (j in 0 until pays.length()) pays.optJSONObject(j)?.let { addRecord(it) }
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    /** علامة تصفير المبالغ المسددة (بداية شهر جديد) — محلياً */
+    fun getPaidTotalsResetAt(): Long = store.getString("paid_totals_reset")?.toLongOrNull() ?: 0L
+
+    /** تصفير المبالغ المسددة: يكتب طابعاً زمنياً بالسحابة — الأرشيف والدفعات المحفوظة لا تُمس */
+    fun resetPaidTotals(): Boolean {
+        val now = System.currentTimeMillis()
+        val payload = JSONObject().put("reset_at", now)
+        val ok = try { FirebaseClient.put("${FirebaseClient.ROOT}/paid_totals_reset", payload) } catch (e: Exception) { false }
+        if (ok) store.putString("paid_totals_reset", now.toString())
         return ok
     }
 
