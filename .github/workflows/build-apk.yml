@@ -39,6 +39,7 @@ jobs:
           gradle assembleDebug --no-daemon --build-cache
 
       - name: Upload APK to Release
+        if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
