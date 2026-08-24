@@ -43,5 +43,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          VC=$(grep -E 'versionCode[[:space:]]*=' app/build.gradle.kts | grep -oE '[0-9]+' | head -1)
+          cp app/build/outputs/apk/debug/app-debug.apk "tasdeed-v${VC}.apk"
           gh release delete tasdeed-latest --yes --repo ${{ github.repository }} || true
-          gh release create tasdeed-latest --repo ${{ github.repository }} --title "تسديد نقي" --notes "النسخة الأخيرة" app/build/outputs/apk/debug/*.apk
+          gh release create tasdeed-latest --repo ${{ github.repository }} --title "Tasdeed v${VC}" --notes "versionCode ${VC}" "tasdeed-v${VC}.apk"
