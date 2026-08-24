@@ -91,7 +91,7 @@ fun AdminStatementScreen(
     var dlOpen by remember { mutableStateOf(false) }
     var shOpen by remember { mutableStateOf(false) }
     var editTarget by remember { mutableStateOf<ReportExporter.SubGroup?>(null) }
-    var subEdits by remember { mutableStateOf<MutableMap<String, String>>(mutableMapOf()) }
+    val subEdits = remember { mutableStateMapOf<String, String>() }
     val amountRegex = Regex("\\d*\\.?\\d*")
     fun plainNum(v: Double): String = if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
 
@@ -113,7 +113,7 @@ fun AdminStatementScreen(
             else vm.toast("❌ فشل حفظ الملف", true)
         }
     }
-    val saveExcel = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.ms-excel")) { uri: Uri? ->
+    val saveExcel = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         scope.launch {
             exporting = true
@@ -134,7 +134,7 @@ fun AdminStatementScreen(
 
     fun doDownload(ext: String) {
         if (ext == "pdf") savePdf.launch("كشف_${title.replace(" ", "_").replace("/", "_")}.pdf")
-        else saveExcel.launch("كشف_${title.replace(" ", "_").replace("/", "_")}.xls")
+        else saveExcel.launch("كشف_${title.replace(" ", "_").replace("/", "_")}.xlsx")
     }
 
     fun buildCacheFile(ext: String): File? = try {
@@ -154,7 +154,7 @@ fun AdminStatementScreen(
             if (file != null) {
                 val uri = androidx.core.content.FileProvider.getUriForFile(ctx, ctx.packageName + ".fileprovider", file)
                 val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = if (ext == "pdf") "application/pdf" else "application/vnd.ms-excel"
+                    type = if (ext == "pdf") "application/pdf" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     putExtra(android.content.Intent.EXTRA_STREAM, uri)
                     addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
@@ -212,7 +212,7 @@ fun AdminStatementScreen(
                     )
                     ListItem(
                         headlineContent = { Text("📊 تنزيل Excel") },
-                        modifier = Modifier.clickable { dlOpen = false; doDownload("xls") }
+                        modifier = Modifier.clickable { dlOpen = false; doDownload("xlsx") }
                     )
                 }
             }
@@ -227,7 +227,7 @@ fun AdminStatementScreen(
                     )
                     ListItem(
                         headlineContent = { Text("📊 مشاركة Excel") },
-                        modifier = Modifier.clickable { shOpen = false; doShare("xls") }
+                        modifier = Modifier.clickable { shOpen = false; doShare("xlsx") }
                     )
                 }
             }
