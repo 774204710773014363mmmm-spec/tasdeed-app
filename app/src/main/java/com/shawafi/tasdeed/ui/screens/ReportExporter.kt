@@ -216,50 +216,134 @@ object ReportExporter {
         val user = vm.user.value ?: ""
         val total = rows.sumOf { it.total }
 
-        val sb = StringBuilder()
-        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-        sb.append("<ss:Workbook xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\">\n")
-        sb.append("<ss:Styles>\n")
-        sb.append("<ss:Style ss:ID=\"title\"><ss:Font ss:Bold=\"1\" ss:Size=\"20\" ss:Color=\"#059669\"/><ss:Alignment ss:ReadingOrder=\"1\"/></ss:Style>\n")
-        sb.append("<ss:Style ss:ID=\"sub\"><ss:Font ss:Size=\"12\" ss:Color=\"#667085\"/><ss:Alignment ss:ReadingOrder=\"1\"/></ss:Style>\n")
-        sb.append("<ss:Style ss:ID=\"date\"><ss:Font ss:Size=\"10\" ss:Color=\"#98A2B3\"/><ss:Alignment ss:ReadingOrder=\"1\"/></ss:Style>\n")
-        sb.append("<ss:Style ss:ID=\"head\"><ss:Font ss:Bold=\"1\" ss:Color=\"#FFFFFF\"/><ss:Interior ss:Color=\"#059669\" ss:Pattern=\"Solid\"/><ss:Alignment ss:ReadingOrder=\"1\"/></ss:Style>\n")
-        sb.append("<ss:Style ss:ID=\"total\"><ss:Font ss:Bold=\"1\" ss:Size=\"18\" ss:Color=\"#D4A843\"/><ss:Alignment ss:ReadingOrder=\"1\"/></ss:Style>\n")
-        sb.append("<ss:Style ss:ID=\"wrapName\"><ss:Alignment ss:WrapText=\"1\" ss:ReadingOrder=\"1\"/><ss:Font ss:Size=\"11\"/></ss:Style>\n")
-        sb.append("<ss:Style ss:ID=\"wrapNote\"><ss:Alignment ss:WrapText=\"1\" ss:ReadingOrder=\"1\"/><ss:Font ss:Size=\"10\" ss:Color=\"#444444\"/></ss:Style>\n")
-        sb.append("<ss:Style ss:ID=\"num\"><ss:Alignment ss:ReadingOrder=\"1\"/><ss:Data ss:Type=\"Number\"/></ss:Style>\n")
-        sb.append("</ss:Styles>\n")
-        sb.append("<ss:Worksheet ss:Name=\"المدفوعات\">\n")
-        sb.append("<ss:Table>\n")
-        sb.append("<ss:Column ss:Width=\"8\"/><ss:Column ss:Width=\"28\"/><ss:Column ss:Width=\"15\"/><ss:Column ss:Width=\"18\"/><ss:Column ss:Width=\"25\"/><ss:Column ss:Width=\"18\"/>\n")
-        sb.append("<ss:Row ss:Height=\"30\"><ss:Cell ss:MergeAcross=\"5\" ss:StyleID=\"title\"><ss:Data ss:Type=\"String\">💰 تقرير المدفوعات</ss:Data></ss:Cell></ss:Row>\n")
-        sb.append("<ss:Row ss:Height=\"20\"><ss:Cell ss:MergeAcross=\"5\" ss:StyleID=\"sub\"><ss:Data ss:Type=\"String\">$brName | $user</ss:Data></ss:Cell></ss:Row>\n")
-        sb.append("<ss:Row ss:Height=\"16\"><ss:Cell ss:MergeAcross=\"5\" ss:StyleID=\"date\"><ss:Data ss:Type=\"String\">$today | عدد الدفعات: ${rows.size}</ss:Data></ss:Cell></ss:Row>\n")
-        sb.append("<ss:Row ss:Height=\"24\">")
-        for (h in arrayOf("#", "اسم المشترك", "رقم العداد", "آخر تاريخ", "ملاحظة", "الإجمالي")) {
-            sb.append("<ss:Cell ss:StyleID=\"head\"><ss:Data ss:Type=\"String\">$h</ss:Data></ss:Cell>")
+        // ── بناء OOXML worksheet حقيقي (inline strings) ──
+        fun cellStr(ref: String, text: String, style: Int = 0): String =
+            "<c r=\"$ref\" s=\"$style\" t=\"inlineStr\"><is><t xml:space=\"preserve\">${escXml(text)}</t></is></c>"
+        fun cellNum(ref: String, v: Double, style: Int = 0): String {
+            val nv = if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
+            return "<c r=\"$ref\" s=\"$style\"><v>$nv</v></c>"
         }
-        sb.append("</ss:Row>\n")
-        rows.forEachIndexed { i, s ->
-            // كل رقم في صف مستقل مع خلايا ملفوفة وارتفاع صف يناسب عدد الأسطر
-            val nameLines = estLines(s.name, 14)
-            val noteLines = estLines(s.note, 12)
-            val rowHeight = (maxOf(nameLines, noteLines, 1) * 16 + 6).coerceAtLeast(20)
-            sb.append("<ss:Row ss:Height=\"$rowHeight\">")
-            sb.append("<ss:Cell ss:StyleID=\"num\"><ss:Data ss:Type=\"Number\">${i + 1}</ss:Data></ss:Cell>")
-            sb.append("<ss:Cell ss:StyleID=\"wrapName\"><ss:Data ss:Type=\"String\">${escXml(s.name.ifEmpty { "-" })}</ss:Data></ss:Cell>")
-            sb.append("<ss:Cell ss:StyleID=\"num\"><ss:Data ss:Type=\"String\">${escXml(s.meter.ifEmpty { "-" })}</ss:Data></ss:Cell>")
-            sb.append("<ss:Cell ss:StyleID=\"num\"><ss:Data ss:Type=\"String\">${s.latestDate}</ss:Data></ss:Cell>")
-            sb.append("<ss:Cell ss:StyleID=\"wrapNote\"><ss:Data ss:Type=\"String\">${escXml(s.note.ifEmpty { "-" })}</ss:Data></ss:Cell>")
-            sb.append("<ss:Cell ss:StyleID=\"num\"><ss:Data ss:Type=\"Number\">${s.total}</ss:Data></ss:Cell>")
-            sb.append("</ss:Row>\n")
-        }
-        sb.append("<ss:Row ss:Height=\"26\"><ss:Cell ss:MergeAcross=\"5\" ss:StyleID=\"total\"><ss:Data ss:Type=\"String\">الإجمالي: ${numFmt.format(total)} د.ع</ss:Data></ss:Cell></ss:Row>\n")
-        sb.append("</ss:Table>\n")
-        sb.append("</ss:Worksheet>\n")
-        sb.append("</ss:Workbook>\n")
+        fun cellNumI(ref: String, v: Int, style: Int = 0): String =
+            "<c r=\"$ref\" s=\"$style\"><v>$v</v></c>"
 
-        out.write(sb.toString().toByteArray(Charsets.UTF_8))
+        val sb = StringBuilder()
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n")
+        sb.append("<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">\n")
+        sb.append("<sheetViews><sheetView rightToLeft=\"1\" workbookViewId=\"0\"/></sheetViews>\n")
+        sb.append("<cols>")
+        val widths = doubleArrayOf(8.0, 30.0, 16.0, 18.0, 26.0, 18.0)
+        for (ci in widths.indices) sb.append("<col min=\"${ci + 1}\" max=\"${ci + 1}\" width=\"${widths[ci]}\" customWidth=\"1\"/>")
+        sb.append("</cols>\n")
+        sb.append("<sheetData>\n")
+        // صف العنوان
+        sb.append("<row r=\"1\" ht=\"30\" customHeight=\"1\">")
+        sb.append(cellStr("A1", "💰 تقرير المدفوعات", 1))
+        sb.append("</row>\n")
+        sb.append("<row r=\"2\" ht=\"20\" customHeight=\"1\">")
+        sb.append(cellStr("A2", "$brName | $user", 2))
+        sb.append("</row>\n")
+        sb.append("<row r=\"3\" ht=\"16\" customHeight=\"1\">")
+        sb.append(cellStr("A3", "$today | عدد الدفعات: ${rows.size}", 2))
+        sb.append("</row>\n")
+        // صف العناوين
+        val heads = arrayOf("#", "اسم المشترك", "رقم العداد", "آخر تاريخ", "ملاحظة", "الإجمالي")
+        sb.append("<row r=\"4\" ht=\"24\" customHeight=\"1\">")
+        for ((ci, h) in heads.withIndex()) sb.append(cellStr(colRef(ci, 4), h, 3))
+        sb.append("</row>\n")
+        // البيانات
+        rows.forEachIndexed { i, s ->
+            val r = i + 5
+            sb.append("<row r=\"$r\">")
+            sb.append(cellNumI(colRef(0, r), i + 1))
+            sb.append(cellStr(colRef(1, r), s.name.ifEmpty { "-" }))
+            sb.append(cellStr(colRef(2, r), s.meter.ifEmpty { "-" }))
+            sb.append(cellStr(colRef(3, r), s.latestDate))
+            sb.append(cellStr(colRef(4, r), s.note.ifEmpty { "-" }))
+            sb.append(cellNum(colRef(5, r), s.total))
+            sb.append("</row>\n")
+        }
+        // الإجمالي
+        val tr = rows.size + 5
+        sb.append("<row r=\"$tr\" ht=\"26\" customHeight=\"1\">")
+        sb.append(cellStr(colRef(0, tr), "الإجمالي: ${numFmt.format(total)} د.ع", 4))
+        sb.append("</row>\n")
+        sb.append("</sheetData>\n")
+        sb.append("</worksheet>")
+
+        writeXlsx(out, sb.toString(), "المدفوعات")
+    }
+
+    private fun colRef(col: Int, row: Int): String {
+        var c = col
+        val sbx = StringBuilder()
+        c += 1
+        while (c > 0) {
+            sbx.insert(0, ('A' + (c - 1) % 26))
+            c = (c - 1) / 26
+        }
+        return "$sbx$row"
+    }
+
+    private fun writeXlsx(out: OutputStream, sheetXml: String, sheetName: String) {
+        val contentTypes = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+            "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\">" +
+            "<Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/>" +
+            "<Default Extension=\"xml\" ContentType=\"application/xml\"/>" +
+            "<Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/>" +
+            "<Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>" +
+            "<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>" +
+            "</Types>"
+        val rels = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+            "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+            "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/>" +
+            "</Relationships>"
+        val workbook = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+            "<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" " +
+            "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\">" +
+            "<sheets><sheet name=\"${escXml(sheetName)}\" sheetId=\"1\" r:id=\"rId1\"/></sheets>" +
+            "</workbook>"
+        val xlRels = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+            "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">" +
+            "<Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/>" +
+            "<Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>" +
+            "</Relationships>"
+        val styles = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>" +
+            "<styleSheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\">" +
+            "<fonts count=\"4\">" +
+            "<font><sz val=\"11\"/><name val=\"Arial\"/></font>" +
+            "<font><b/><sz val=\"16\"/><color rgb=\"FF059669\"/><name val=\"Arial\"/></font>" +
+            "<font><sz val=\"10\"/><color rgb=\"FF667085\"/><name val=\"Arial\"/></font>" +
+            "<font><b/><sz val=\"11\"/><color rgb=\"FFFFFFFF\"/><name val=\"Arial\"/></font>" +
+            "</fonts>" +
+            "<fills count=\"3\">" +
+            "<fill><patternFill patternType=\"none\"/></fill>" +
+            "<fill><patternFill patternType=\"gray125\"/></fill>" +
+            "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF059669\"/><bgColor indexed=\"64\"/></patternFill></fill>" +
+            "</fills>" +
+            "<borders count=\"1\"><border><left/><right/><top/><bottom/><diagonal/></border></borders>" +
+            "<cellStyleXfs count=\"1\"><xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\"/></cellStyleXfs>" +
+            "<cellXfs count=\"5\">" +
+            "<xf numFmtId=\"0\" fontId=\"0\" fillId=\"0\" borderId=\"0\" xfId=\"0\"/>" +
+            "<xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\" readingOrder=\"2\"/></xf>" +
+            "<xf numFmtId=\"0\" fontId=\"2\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\" readingOrder=\"2\"/></xf>" +
+            "<xf numFmtId=\"0\" fontId=\"3\" fillId=\"2\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyFill=\"1\" applyAlignment=\"1\"><alignment horizontal=\"center\" vertical=\"center\" readingOrder=\"2\"/></xf>" +
+            "<xf numFmtId=\"0\" fontId=\"1\" fillId=\"0\" borderId=\"0\" xfId=\"0\" applyFont=\"1\" applyAlignment=\"1\"><alignment horizontal=\"right\" vertical=\"center\" readingOrder=\"2\"/></xf>" +
+            "</cellXfs>" +
+            "</styleSheet>"
+        val zos = java.util.zip.ZipOutputStream(out)
+        fun put(name: String, content: String) {
+            zos.putNextEntry(java.util.zip.ZipEntry(name))
+            zos.write(content.toByteArray(Charsets.UTF_8))
+            zos.closeEntry()
+        }
+        put("[Content_Types].xml", contentTypes)
+        put("_rels/.rels", rels)
+        put("xl/workbook.xml", workbook)
+        put("xl/_rels/workbook.xml.rels", xlRels)
+        put("xl/styles.xml", styles)
+        put("xl/worksheets/sheet1.xml", sheetXml)
+        zos.finish()
+        zos.flush()
     }
 
     data class SubGroup(
