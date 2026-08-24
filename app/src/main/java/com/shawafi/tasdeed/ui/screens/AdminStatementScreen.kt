@@ -235,39 +235,47 @@ fun AdminStatementScreen(
 
         if (grouped.isEmpty()) {
             Box(Modifier.weight(1f).fillMaxWidth().padding(vertical = 60.dp), contentAlignment = Alignment.Center) {
-                Text("📦 لا توجد مدفوعات في هذا الكشف", color = Color.Gray)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("📦", fontSize = 42.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Text("لا توجد مدفوعات في هذا الكشف", color = Color.Gray, fontSize = 14.sp)
+                }
             }
         } else {
-            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 item {
-                    Row(Modifier.fillMaxWidth().background(Green).padding(vertical = 10.dp, horizontal = 8.dp)) {
-                        Text("#", Modifier.width(28.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
-                        Text("المشترك", Modifier.weight(1.4f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, maxLines = 1)
-                        Text("العداد", Modifier.weight(0.9f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, textAlign = TextAlign.Center, maxLines = 1)
-                        Text("آخر تاريخ", Modifier.weight(1f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, textAlign = TextAlign.Center, maxLines = 1)
-                        Text("الإجمالي", Modifier.weight(0.8f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.5.sp, textAlign = TextAlign.End, maxLines = 1)
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .background(GreenBrush, RoundedCornerShape(14.dp))
+                            .padding(vertical = 12.dp, horizontal = 12.dp)
+                    ) {
+                        Text("#", Modifier.width(26.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("المشترك", Modifier.weight(1.4f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                        Text("العداد", Modifier.weight(0.9f), color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1)
+                        Text("آخر تاريخ", Modifier.weight(1f), color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1)
+                        Text("الإجمالي", Modifier.weight(0.85f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.End, maxLines = 1)
                     }
                 }
                 itemsIndexed(grouped, key = { _, s -> s.key + s.name }) { i, s ->
                     Row(
                         Modifier.fillMaxWidth()
                             .background(
-                                if (i % 2 == 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                                else MaterialTheme.colorScheme.surface
+                                if (i % 2 == 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                else MaterialTheme.colorScheme.surface,
+                                RoundedCornerShape(12.dp)
                             )
                             .combinedClickable(
                                 onClick = {},
                                 onLongClick = { editTarget = s }
                             )
-                            .padding(vertical = 10.dp, horizontal = 8.dp)
+                            .padding(vertical = 11.dp, horizontal = 12.dp)
                     ) {
-                        Text("${i + 1}", Modifier.width(28.dp), fontSize = 12.sp, color = Color.Gray)
+                        Text("${i + 1}", Modifier.width(26.dp), fontSize = 11.5.sp, color = Color.Gray)
                         Text(s.name.ifEmpty { "-" }, Modifier.weight(1.4f).basicMarquee(iterations = Int.MAX_VALUE), fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         Text(s.meter.ifEmpty { "-" }, Modifier.weight(0.9f), fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         Text(s.latestDate, Modifier.weight(1f), fontSize = 11.sp, color = Color.Gray, textAlign = TextAlign.Center, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        Text(formatNum(s.total), Modifier.weight(0.8f), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Green, textAlign = TextAlign.End, maxLines = 1)
+                        Text(formatNum(s.total), Modifier.weight(0.85f), fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Green, textAlign = TextAlign.End, maxLines = 1)
                     }
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
                 }
             }
         }
@@ -294,23 +302,28 @@ fun AdminStatementScreen(
                     if (subPays.isEmpty()) {
                         Text("لا توجد دفعات", color = Color.Gray)
                     } else {
-                        LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth()) {
+                        LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             itemsIndexed(subPays, key = { _, p -> p.localId }) { _, p ->
-                                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    Modifier.fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     OutlinedTextField(
                                         value = subEdits[p.localId] ?: plainNum(p.amount),
                                         onValueChange = { if (it.matches(amountRegex)) subEdits[p.localId] = it },
                                         singleLine = true,
+                                        shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier.width(110.dp),
-                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, textAlign = TextAlign.Center)
+                                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold)
                                     )
                                     Spacer(Modifier.width(8.dp))
                                     Column(Modifier.weight(1f)) {
-                                        Text(p.subscriberName, fontSize = 12.sp, maxLines = 1, modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE))
+                                        Text(p.subscriberName, fontSize = 12.sp, maxLines = 1, modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE), fontWeight = FontWeight.SemiBold)
                                         Text("📅 ${p.paymentDate}", fontSize = 10.5.sp, color = Color.Gray)
                                     }
                                 }
-                                HorizontalDivider(color = Color.LightGray.copy(alpha = 0.4f))
                             }
                         }
                     }
@@ -321,12 +334,13 @@ fun AdminStatementScreen(
                             editTarget = null
                             vm.toast("🗑️ تم حذف الدفعات - اضغط 💾 للحفظ")
                         },
+                        shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.fillMaxWidth().height(44.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
                     ) { Text("🗑️ حذف هذه الدفعات", color = Color.White, fontWeight = FontWeight.Bold) }
                     Spacer(Modifier.height(10.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(onClick = { editTarget = null }, modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
+                        OutlinedButton(onClick = { editTarget = null }, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).height(46.dp)) { Text("إلغاء") }
                         Button(
                             onClick = {
                                 val edited = subPays.mapNotNull { p ->
@@ -342,9 +356,10 @@ fun AdminStatementScreen(
                                 editTarget = null
                                 vm.toast("✏️ عدّل الدفعات - اضغط 💾 للحفظ")
                             },
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f).height(46.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Green)
-                        ) { Text("✔️ تعديل") }
+                        ) { Text("✔️ تعديل", fontWeight = FontWeight.Bold) }
                     }
                 }
             }
