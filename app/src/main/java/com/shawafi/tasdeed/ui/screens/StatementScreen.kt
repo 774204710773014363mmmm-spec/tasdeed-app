@@ -73,7 +73,12 @@ fun StatementScreen(
             val rows = list.map { p ->
                 ReportExporter.SubGroup(
                     key = p.localId,
-                    name = if (isMy) p.note.ifEmpty { "دفعة" } else p.subscriberName,
+                    // حساباتي: المستفيد أولاً ثم الملاحظة
+                    name = if (isMy) {
+                        val bn = p.subscriberName.takeIf { it.isNotEmpty() && it != "دفعة" }
+                        val nt = p.note.takeIf { it.isNotEmpty() }
+                        listOfNotNull(bn, nt).joinToString(" — ").ifEmpty { "دفعة" }
+                    } else p.subscriberName,
                     meter = p.meterNumber.ifEmpty { "" },
                     num = "",
                     total = p.amount,
@@ -280,7 +285,7 @@ fun StatementScreen(
                             .padding(vertical = 12.dp, horizontal = 12.dp)
                     ) {
                         Text("#", Modifier.width(26.dp), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        Text(if (isMy) "الملاحظة" else "المشترك", Modifier.weight(1.4f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(if (isMy) "المستفيد / الملاحظة" else "المشترك", Modifier.weight(1.4f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("العداد", Modifier.weight(0.9f), color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("آخر تاريخ", Modifier.weight(1f), color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("الإجمالي", Modifier.weight(0.85f), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -333,7 +338,14 @@ fun StatementScreen(
                             )
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(if (isMy) p.note.ifEmpty { "دفعة" } else p.subscriberName, fontSize = 13.sp, maxLines = 1, modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE), fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    if (isMy) {
+                                        val bn = p.subscriberName.takeIf { it.isNotEmpty() && it != "دفعة" }
+                                        val nt = p.note.takeIf { it.isNotEmpty() }
+                                        listOfNotNull(bn, nt).joinToString(" — ").ifEmpty { "دفعة" }
+                                    } else p.subscriberName,
+                                    fontSize = 13.sp, maxLines = 1, modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE), fontWeight = FontWeight.SemiBold
+                                )
                                 Text("📅 ${p.paymentDate}", fontSize = 10.5.sp, color = Color.Gray)
                             }
                         }
