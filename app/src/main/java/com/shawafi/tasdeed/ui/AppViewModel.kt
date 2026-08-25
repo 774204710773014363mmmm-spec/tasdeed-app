@@ -56,6 +56,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val isOnline = MutableStateFlow(true)
     // مفاتيح الكشوف المحذوفة (سحابياً) لمنع عودتها لأي جهاز: "name|createdAt"
     val deletedKeys = MutableStateFlow<Set<String>>(emptySet())
+    // إجمالي المدفوعات لكل مشترك (الاسم lowercase) — من أرشيفات كل الفروع
+    val paidTotals = MutableStateFlow<Map<String, Double>>(emptyMap())
 
     private var lockJob: Job? = null
     private var frameJob: Job? = null
@@ -193,6 +195,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 if (usedNetwork) {
                     fetchFreePayments()
                     fetchArchiveFromCloud()
+                    fetchPaidTotals()
                 }
                 toast("مرحباً $u 👋")
             }
@@ -270,6 +273,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     startLocksLoop()
                     if (useNetwork) fetchFreePayments()
                     if (useNetwork) fetchArchiveFromCloud()
+                    if (useNetwork) fetchPaidTotals()
                     toast("مرحباً $username 👋")
                 }
             }
@@ -441,13 +445,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- حساباتي (كشف شخصي) ----------
 
-    fun addMyAccountPayment(amount: Double, note: String, idx: Int = -1) {
+    fun addMyAccountPayment(amount: Double, note: String, idx: Int = -1, beneficiary: String = "دفعة") {
         if (myPeriods.value.isEmpty()) {
             toast("⚠️ أنشئ كشفاً أولاً من شاشة حساباتي", true)
             return
         }
         val rec = PaymentRecord(
-            subscriberName = "دفعة",
+            subscriberName = beneficiary.ifEmpty { "دفعة" },
             meterNumber = "",
             amount = amount,
             note = note,
@@ -678,6 +682,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     try { repo.pushArchive(bk, currentPayments.value, periods.value) } catch (e: Exception) {}
                 }
             }
+            fetchPaidTotals()
         }
     }
 
@@ -790,5 +795,50 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun randomSuffix(): String {
         val chars = "abcdefghijklmnopqrstuvwxyz0123456789"
         return (1..6).map { chars.random() }.joinToString("")
+    }
+
+    // ---------- paid totals ----------
+
+    fun fetchPaidTotals() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val resetAt = repo.getPaidTotalsResetAt()
+                    store.putString("paid_totals_reset", resetAt.toString())
+                    paidTotals.value = repo.fetchPaidTotals(resetAt)
+                } catch (e: Exception) {}
+            }
+        }
+    }
+
+    fun resetPaidTotals() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    repo.resetPaidTotals()
+                    store.putString("paid_totals_reset", System.currentTimeMillis().toString())
+                    paidTotals.value = emptyMap()
+                } catch (e: Exception) {}
+            }
+            toast("🗑️ تم تصفير المبالغ المسددة — ابدأ العد من الآن")
+        }
+    }
+
+    // ---------- delete subscriber ----------
+
+    fun deleteSubscriber(key: String) {
+        val sub = allSubscribers.value.firstOrNull { it.key == key } ?: return
+        viewModelScope.launch {
+            loading.value = true
+            val ok = withContext(Dispatchers.IO) { repo.deleteSubscriberFromCloud(sub) }
+            loading.value = false
+            if (ok) {
+                allSubscribers.value = allSubscribers.value.filterNot { it.key == key }
+                applySubscriberFilter()
+                toast("🗑️ تم حذف «${sub.name}» من النظام والسحابة")
+            } else {
+                toast("❌ تعذر الحذف — تحقق من اتصال النت", true)
+            }
+        }
     }
 }
