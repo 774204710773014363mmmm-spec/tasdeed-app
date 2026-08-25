@@ -305,32 +305,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 applySubscriberFilter()
             }
         }
-        loadPaidTotals()
-    }
-
-    /** إجمالي المسدد لكل مشترك من أرشيف سحابة التطبيق (كل الفروع) — لشاشة إدارة المشتركين */
-    val paidTotals = MutableStateFlow<Map<String, Double>>(emptyMap())
-
-    private fun loadPaidTotals() {
-        viewModelScope.launch {
-            val m = withContext(Dispatchers.IO) {
-                try { repo.fetchPaidTotals() } catch (e: Exception) { emptyMap() }
-            }
-            paidTotals.value = m
-        }
-    }
-
-    /** تصفير المبالغ المسددة (بداية شهر جديد) — الأرشيف لا يُمس، فقط يبدأ الاحتساب من الآن */
-    fun resetPaidTotals() {
-        viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) { repo.resetPaidTotals() }
-            if (ok) {
-                paidTotals.value = emptyMap()
-                toast("🗑️ تم تصفير المبالغ المسددة — بداية شهر جديد")
-            } else {
-                toast("تعذرت المزامنة مع السحابة (تحقق من النت)", true)
-            }
-        }
     }
 
     /** فلترة المشتركين: المخفيون (hidden) يظهرون فقط لجهاز المطور */
@@ -485,9 +459,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             localId = "my_" + System.currentTimeMillis() + "_" + randomSuffix()
         )
         val idx = myPeriods.value.lastIndex
-        myPeriods.value[idx].payments.add(rec)
-        store.saveMyPeriods(myPeriods.value)
-        toast("✅ تم حفظ الدفعة في حساباتي")
+        // إعادة إسناد بقائمة جديدة حتى تنعش الواجهة فوراً (StateFlow لا يرصد التعديل الموضعي)
+        val lp = myPeriods.value.toMutableList()
+        lp[idx] = lp[idx].copy(payments = (lp[idx].payments + rec).toMutableList())
+        myPeriods.value = lp
+        store.saveMyPeriods(lp)
+        toast("✅ تم حفظ الدفعة في كشف: ${lp[idx].name}")
     }
 
     fun reloadMyAccount() {
@@ -766,6 +743,31 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             pushArchiveCloud()
             toast("✅ تم تعديل الاسم")
         }
+    }
+
+    /** دمج كشفين: نقل كل دفعات fromIdx إلى intoIdx ثم حذف fromIdx محلياً ومن السحابة */
+    fun mergePeriods(fromIdx: Int, intoIdx: Int) {
+        val list = periods.value
+        if (fromIdx !in list.indices || intoIdx !in list.indices || fromIdx == intoIdx) return
+        val from = list[fromIdx]
+        val into = list[intoIdx]
+        val lp = list.toMutableList()
+        lp[intoIdx] = into.copy(payments = (into.payments + from.payments).toMutableList())
+        lp.removeAt(fromIdx)
+        periods.value = lp
+        saveBranchArchive()
+        pushArchiveCloud()
+        val key = "${from.name}|${from.createdAt}"
+        deletedKeys.value = deletedKeys.value + key
+        val bk = branchKey.value
+        if (bk != null) {
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) {
+                    try { repo.pushArchiveDeleted(bk, deletedKeys.value.toList()) } catch (e: Exception) {}
+                }
+            }
+        }
+        toast("🔗 تم دمج «${from.name}» في «${into.name}»")
     }
 
     fun saveEditedPeriod(idx: Int, editedIds: Set<String>, newAmounts: Map<String, Double>) {
