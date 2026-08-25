@@ -332,6 +332,7 @@ fun FreeScreen(
 fun AddMyPaymentDialog(vm: AppViewModel, onDismiss: () -> Unit) {
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    var beneficiary by remember { mutableStateOf("") }
     val myPeriods by vm.myPeriods.collectAsState()
     var periodIdx by remember { mutableStateOf(if (myPeriods.isEmpty()) -1 else myPeriods.lastIndex) }
     var periodMenu by remember { mutableStateOf(false) }
@@ -374,6 +375,14 @@ fun AddMyPaymentDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                 }
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
+                    value = beneficiary,
+                    onValueChange = { beneficiary = it },
+                    label = { Text("اسم المستفيد") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it },
                     label = { Text("المبلغ (د.ع)") },
@@ -395,7 +404,7 @@ fun AddMyPaymentDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                         onClick = {
                             val amt = amount.toDoubleOrNull() ?: 0.0
                             if (amt <= 0) { vm.toast("أدخل مبلغ صحيح", true); return@Button }
-                            vm.addMyAccountPayment(amt, note.trim(), periodIdx)
+                            vm.addMyAccountPayment(amt, note.trim(), periodIdx, beneficiary.trim())
                             onDismiss()
                         },
                         modifier = Modifier.weight(1f).height(48.dp),
