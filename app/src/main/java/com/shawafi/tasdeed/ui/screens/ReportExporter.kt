@@ -24,7 +24,8 @@ object ReportExporter {
         if (isMy || !merge) {
             val rows = list.map {
                 RowData(
-                    if (isMy) it.note.ifEmpty { "دفعة" } else it.subscriberName,
+                    // حساباتي: عمود الاسم = اسم المستفيد، والملاحظة تبقى بعمودها الخاص (PDF/Excel)
+                    it.subscriberName.ifEmpty { "دفعة" },
                     it.meterNumber,
                     it.paymentDate,
                     it.note,
