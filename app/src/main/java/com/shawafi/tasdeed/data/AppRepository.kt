@@ -344,6 +344,66 @@ class AppRepository(val store: LocalStore) {
         FirebaseClient.update("${FirebaseClient.ROOT}/stats", payload)
     }
 
+    // ---------- paid totals ----------
+
+    fun getPaidTotalsResetAt(): Long {
+        val o = FirebaseClient.get("${FirebaseClient.ROOT}/app_config") ?: return 0
+        return o.optLong("paid_totals_reset", 0)
+    }
+
+    fun resetPaidTotals(): Boolean {
+        val payload = JSONObject()
+        payload.put("paid_totals_reset", System.currentTimeMillis())
+        return FirebaseClient.update("${FirebaseClient.ROOT}/app_config", payload)
+    }
+
+    /** تجميع إجمالي المدفوعات لكل مشترك من كل أرشيفات الفروع — ناقص المحذوفات + ناقص الأقدم من resetAt */
+    fun fetchPaidTotals(resetAt: Long): Map<String, Double> {
+        val totals = mutableMapOf<String, Double>()
+        val root = try { FirebaseClient.get("${FirebaseClient.ROOT}/archive") } catch (e: Exception) { null }
+            ?: return totals
+        root.keys().forEach { branchKey ->
+            val bd = root.optJSONObject(branchKey) ?: return@forEach
+            bd.optJSONArray("current")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val p = arr.optJSONObject(i) ?: continue
+                    val name = p.optString("subscriber_name", "").lowercase()
+                    val amt = p.optDouble("amount", 0.0)
+                    val ts = p.optLong("created_at", 0)
+                    if (ts > resetAt && amt > 0 && name.isNotEmpty()) totals[name] = (totals[name] ?: 0.0) + amt
+                }
+            }
+            bd.optJSONArray("periods")?.let { arr ->
+                for (i in 0 until arr.length()) {
+                    val period = arr.optJSONObject(i) ?: continue
+                    period.optJSONArray("payments")?.let { pays ->
+                        for (j in 0 until pays.length()) {
+                            val p = pays.optJSONObject(j) ?: continue
+                            val name = p.optString("subscriber_name", "").lowercase()
+                            val amt = p.optDouble("amount", 0.0)
+                            val ts = p.optLong("created_at", 0)
+                            if (ts > resetAt && amt > 0 && name.isNotEmpty()) totals[name] = (totals[name] ?: 0.0) + amt
+                        }
+                    }
+                }
+            }
+        }
+        return totals
+    }
+
+    // ---------- delete subscriber ----------
+
+    fun deleteSubscriberFromCloud(sub: Subscriber): Boolean {
+        val ok = try { FirebaseClient.delete("${FirebaseClient.ROOT}/subscribers/${sub.key}") } catch (e: Exception) { false }
+        if (ok) {
+            subscribersCache.remove(sub.key)
+            saveLocalSubscribers(subscribersCache)
+            // حذف عقدة الإخفاء المرتبطة
+            try { FirebaseClient.delete("${FirebaseClient.ROOT}/subscriber_flags/${flagIdentity(sub.name, sub.meterNumber)}") } catch (e: Exception) {}
+        }
+        return ok
+    }
+
     fun currentDate(): String {
         val c = java.util.Calendar.getInstance()
         return "%04d/%02d/%02d".format(c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1, c.get(java.util.Calendar.DAY_OF_MONTH))
