@@ -25,6 +25,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.biometric.BiometricManager
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
+import com.shawafi.tasdeed.ui.theme.GreenDark
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -221,6 +222,37 @@ fun SettingsScreen(
                             }
                         }
                     )
+                    if (devMode) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+                        var resetConfirm by remember { mutableStateOf(false) }
+                        ListItem(
+                            headlineContent = { Text("🗑️ حذف المبالغ المسددة (بداية شهر جديد)", fontWeight = FontWeight.Medium, fontSize = 13.sp) },
+                            supportingContent = { Text("يصفّر العداد ويبدأ من الصفر — لا يحذف الدفعات الأرشيفية", fontSize = 11.sp) },
+                            modifier = Modifier.clickable { resetConfirm = true }
+                        )
+                        if (resetConfirm) {
+                            Dialog(onDismissRequest = { resetConfirm = false }) {
+                                Surface(shape = RoundedCornerShape(20.dp)) {
+                                    Column(Modifier.padding(20.dp)) {
+                                        Text("🗑️ تصفير المبالغ المسددة", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                                        Spacer(Modifier.height(8.dp))
+                                        Text("سيتم حذف جميع إجماليات الدفعات المسددة لكل المشتركين (العداد الأخضر).", fontSize = 12.sp, color = Color.Gray)
+                                        Text("الدفعات الأرشيفية نفسها لا تُمس. ابدأ العد من جديد لشهر جديد.", fontSize = 12.sp, color = Color.Gray)
+                                        Spacer(Modifier.height(18.dp))
+                                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            OutlinedButton(onClick = { resetConfirm = false }, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).height(48.dp)) { Text("إلغاء") }
+                                            Button(
+                                                onClick = { vm.resetPaidTotals(); resetConfirm = false },
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier.weight(1f).height(48.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                                            ) { Text("🗑️ تصفير", fontWeight = FontWeight.Bold) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -343,7 +375,7 @@ fun SettingsScreen(
 
 @Composable
 fun SectionLabel(text: String) {
-    Text(text, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray, modifier = Modifier.padding(horizontal = 4.dp))
+    Text(text, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = GreenDark, modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp))
 }
 
 @Composable
