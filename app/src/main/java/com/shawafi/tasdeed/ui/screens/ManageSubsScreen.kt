@@ -35,7 +35,6 @@ fun ManageSubsScreen(
     var query by remember { mutableStateOf("") }
     val subs by vm.allSubscribers.collectAsState()
     val devMode by vm.devMode.collectAsState()
-    val paidTotals by vm.paidTotals.collectAsState()
 
     Column(modifier = modifier.padding(padding)) {
         TopBar(vm, "إدارة المشتركين", onRefresh = { vm.reloadSubscribers() })
@@ -75,7 +74,6 @@ fun ManageSubsScreen(
                 items(filtered, key = { it.key }) { sub ->
                     ManageSubCard(
                         sub = sub,
-                        paidTotal = paidTotals[sub.name.trim().lowercase()] ?: 0.0,
                         onToggleHidden = { vm.setSubscriberHidden(sub.key, it) },
                         onToggleAmounts = { vm.setSubscriberHideAmounts(sub.key, it) }
                     )
@@ -88,7 +86,6 @@ fun ManageSubsScreen(
 @Composable
 fun ManageSubCard(
     sub: Subscriber,
-    paidTotal: Double,
     onToggleHidden: (Boolean) -> Unit,
     onToggleAmounts: (Boolean) -> Unit
 ) {
@@ -119,22 +116,11 @@ fun ManageSubCard(
                     Spacer(Modifier.height(2.dp))
                     Text("📟 ${sub.meterNumber.ifEmpty { "-" }}", fontSize = 12.sp, color = Color.Gray)
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(
-                        "💰 ${formatNum(sub.displayBalance)} د.ع",
-                        fontSize = 12.sp,
-                        color = if (sub.displayBalance > 0) Color(0xFFDC2626) else Green
-                    )
-                    if (paidTotal > 0) {
-                        Spacer(Modifier.height(3.dp))
-                        Text(
-                            "✅ مسدد: ${formatNum(paidTotal)} د.ع",
-                            fontSize = 11.sp,
-                            color = Green,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                }
+                Text(
+                    "💰 ${formatNum(sub.displayBalance)} د.ع",
+                    fontSize = 12.sp,
+                    color = if (sub.displayBalance > 0) Color(0xFFDC2626) else Green
+                )
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 8.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
