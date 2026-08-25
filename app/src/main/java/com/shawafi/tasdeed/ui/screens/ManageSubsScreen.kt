@@ -1,7 +1,8 @@
 package com.shawafi.tasdeed.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,12 +21,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.shawafi.tasdeed.data.Subscriber
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
 import com.shawafi.tasdeed.ui.theme.GreenLight
+import com.shawafi.tasdeed.ui.theme.ElectricCardBrush
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ManageSubsScreen(
     vm: AppViewModel,
@@ -35,9 +38,11 @@ fun ManageSubsScreen(
     var query by remember { mutableStateOf("") }
     val subs by vm.allSubscribers.collectAsState()
     val devMode by vm.devMode.collectAsState()
+    val paidTotals by vm.paidTotals.collectAsState()
+    var deleteTarget by remember { mutableStateOf<Subscriber?>(null) }
 
     Column(modifier = modifier.padding(padding)) {
-        TopBar(vm, "إدارة المشتركين", onRefresh = { vm.reloadSubscribers() })
+        TopBar(vm, "إدارة المشتركين", onRefresh = { vm.reloadSubscribers(); vm.fetchPaidTotals() })
 
         if (!devMode) {
             Box(Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) {
@@ -74,33 +79,68 @@ fun ManageSubsScreen(
                 items(filtered, key = { it.key }) { sub ->
                     ManageSubCard(
                         sub = sub,
+                        paidTotal = paidTotals[sub.name.lowercase()] ?: 0.0,
                         onToggleHidden = { vm.setSubscriberHidden(sub.key, it) },
-                        onToggleAmounts = { vm.setSubscriberHideAmounts(sub.key, it) }
+                        onToggleAmounts = { vm.setSubscriberHideAmounts(sub.key, it) },
+                        onLongPress = { deleteTarget = sub }
                     )
+                }
+            }
+        }
+    }
+
+    // تأكيد حذف مشترك
+    val delSub = deleteTarget
+    if (delSub != null) {
+        Dialog(onDismissRequest = { deleteTarget = null }) {
+            Surface(shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(20.dp)) {
+                    Text("🗑 حذف مشترك", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                    Spacer(Modifier.height(10.dp))
+                    Text("هل تريد حذف «${delSub.name}» من النظام بالكامل؟", fontSize = 13.5.sp)
+                    Text("سيتم حذفه من جهازك ومن السحابة ولا سيظهر لأي فرع.", fontSize = 12.sp, color = Color.Gray)
+                    Spacer(Modifier.height(18.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        OutlinedButton(onClick = { deleteTarget = null }, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).height(48.dp)) { Text("إلغاء") }
+                        Button(
+                            onClick = { vm.deleteSubscriber(delSub.key); deleteTarget = null },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                        ) { Text("🗑 حذف", fontWeight = FontWeight.Bold) }
+                    }
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ManageSubCard(
     sub: Subscriber,
+    paidTotal: Double = 0.0,
     onToggleHidden: (Boolean) -> Unit,
-    onToggleAmounts: (Boolean) -> Unit
+    onToggleAmounts: (Boolean) -> Unit,
+    onLongPress: () -> Unit = {}
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().combinedClickable(
+            onClick = {},
+            onLongClick = onLongPress
+        ),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (sub.hidden || sub.hideAmounts)
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
-            else MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Column {
+            // هيدر متدرج بidakarta الاسم والعداد
+            Row(
+                Modifier.fillMaxWidth().background(ElectricCardBrush).padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     Modifier
                         .size(42.dp)
@@ -112,18 +152,29 @@ fun ManageSubCard(
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(sub.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+                    Text(sub.name, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Color(0xFF0C4A6E))
                     Spacer(Modifier.height(2.dp))
-                    Text("📟 ${sub.meterNumber.ifEmpty { "-" }}", fontSize = 12.sp, color = Color.Gray)
+                    Text("📟 ${sub.meterNumber.ifEmpty { "-" }}", fontSize = 12.sp, color = Color(0xFF0369A1))
                 }
-                Text(
-                    "💰 ${formatNum(sub.displayBalance)} د.ع",
-                    fontSize = 12.sp,
-                    color = if (sub.displayBalance > 0) Color(0xFFDC2626) else Green
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        "💰 ${formatNum(sub.displayBalance)} د.ع",
+                        fontSize = 12.sp,
+                        color = if (sub.displayBalance > 0) Color(0xFFDC2626) else Green,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (paidTotal > 0) {
+                        Text(
+                            "✅ مسدد ${formatNum(paidTotal)} د.ع",
+                            fontSize = 11.sp,
+                            color = Color(0xFF22C55E),
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), modifier = Modifier.padding(vertical = 8.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            // محتوى البطاقة
+            Column(Modifier.padding(12.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text("🙈 إخفاء عن الفروع", fontWeight = FontWeight.Medium, fontSize = 13.sp)
                     Text(
@@ -145,6 +196,9 @@ fun ManageSubCard(
                     )
                 }
                 Switch(checked = sub.hideAmounts, onCheckedChange = onToggleAmounts)
+            }
+            // تلميح: اضغط مطولاً للحذف
+            Text("💡 اضغط مطولاً على الاسم لحذف المشترك", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
