@@ -441,7 +441,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- حساباتي (كشف شخصي) ----------
 
-    fun addMyAccountPayment(amount: Double, note: String) {
+    fun addMyAccountPayment(amount: Double, note: String, idx: Int = -1) {
         if (myPeriods.value.isEmpty()) {
             toast("⚠️ أنشئ كشفاً أولاً من شاشة حساباتي", true)
             return
@@ -458,13 +458,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             createdAt = System.currentTimeMillis(),
             localId = "my_" + System.currentTimeMillis() + "_" + randomSuffix()
         )
-        val idx = myPeriods.value.lastIndex
+        // الكشف المختار من القائمة، أو الأحدث افتراضياً
+        val target = if (idx in myPeriods.value.indices) idx else myPeriods.value.lastIndex
         // إعادة إسناد بقائمة جديدة حتى تنعش الواجهة فوراً (StateFlow لا يرصد التعديل الموضعي)
         val lp = myPeriods.value.toMutableList()
-        lp[idx] = lp[idx].copy(payments = (lp[idx].payments + rec).toMutableList())
+        lp[target] = lp[target].copy(payments = (lp[target].payments + rec).toMutableList())
         myPeriods.value = lp
         store.saveMyPeriods(lp)
-        toast("✅ تم حفظ الدفعة في كشف: ${lp[idx].name}")
+        toast("✅ تم حفظ الدفعة في كشف: ${lp[target].name}")
     }
 
     fun reloadMyAccount() {
