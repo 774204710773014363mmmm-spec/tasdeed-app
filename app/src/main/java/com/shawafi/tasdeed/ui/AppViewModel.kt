@@ -99,12 +99,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     init {
+        // إصلاح الكشوف المكررة المحفوظة قديماً (تسبب انهيار القوائم بمفاتيح مكررة)
+        myPeriods.value = repairDuplicatePeriods(myPeriods.value) { store.saveMyPeriods(it) }
+        periods.value = repairDuplicatePeriods(periods.value) { store.savePeriods(it, branchKey.value) }
         // لا دخول تلقائي: دائماً تظهر شاشة تسجيل الدخول (ببيانات محفوظة إن وجدت)
         val savedUser = store.getString("saved_user")
         if (savedUser != null) {
             repo.loadFromCache()
         }
         startNetLoop()
+    }
+
+    /** إصلاح الكشوف ذات الاسم+التاريخ المتطابقين: يعاد تسمية المكرر بلاحقة (2)(3).. حتى لا تنهار شاشات Compose */
+    private fun repairDuplicatePeriods(list: MutableList<Period>, save: (MutableList<Period>) -> Unit): MutableList<Period> {
+        val out = mutableListOf<Period>()
+        val seen = mutableSetOf<String>()
+        var changed = false
+        for (p in list) {
+            val k = p.name + "|" + p.createdAt
+            if (k !in seen) {
+                out.add(p); seen.add(k); continue
+            }
+            changed = true
+            var i = 2
+            while (out.any { it.name == "${p.name} ($i)" }) i++
+            out.add(p.copy(name = "${p.name} ($i)", closedAt = System.currentTimeMillis() + i))
+        }
+        if (changed) save(out)
+        return out
     }
 
     private fun startNetLoop() {
@@ -226,7 +248,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     // تحميل كشوفات الفرع الحالي من المخزن المحلي (يستبدل قوائم الفرع السابق)
     private fun loadBranchArchive(branch: String) {
         currentPayments.value = store.loadPayments(branch).toMutableList()
-        periods.value = store.loadPeriods(branch).toMutableList()
+        periods.value = repairDuplicatePeriods(store.loadPeriods(branch).toMutableList()) { store.savePeriods(it, branch) }
     }
 
     fun clearToast() {
@@ -478,15 +500,21 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun newMyPeriod(name: String) {
+        val n = name.trim()
+        if (n.isEmpty()) { toast("⚠️ أدخل اسم الكشف", true); return }
+        if (myPeriods.value.any { it.name == n }) {
+            toast("⚠️ يوجد كشف بهذا الاسم بالفعل — اختر اسماً آخر", true)
+            return
+        }
         val p = Period(
-            name = name,
+            name = n,
             payments = mutableListOf(),
             createdAt = repo.currentDate(),
             closedAt = System.currentTimeMillis()
         )
         myPeriods.value = (myPeriods.value + p).toMutableList()
         store.saveMyPeriods(myPeriods.value)
-        toast("✅ تم فتح كشف حساباتي جديد: $name")
+        toast("✅ تم فتح كشف حساباتي جديد: $n")
     }
 
     fun deleteMyPeriod(idx: Int) {
@@ -696,8 +724,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun newPeriod(name: String) {
+        val n = name.trim()
+        if (n.isEmpty()) { toast("⚠️ أدخل اسم الكشف", true); return }
+        if (periods.value.any { it.name == n }) {
+            toast("⚠️ يوجد كشف بهذا الاسم بالفعل — اختر اسماً آخر", true)
+            return
+        }
         val p = Period(
-            name = name,
+            name = n,
             payments = mutableListOf(),
             createdAt = repo.currentDate(),
             closedAt = System.currentTimeMillis()
@@ -705,7 +739,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         periods.value = (periods.value + p).toMutableList()
         saveBranchArchive()
         pushArchiveCloud()
-        toast("✅ تم فتح كشف جديد: $name")
+        toast("✅ تم فتح كشف جديد: $n")
     }
 
     fun savePeriodData(idx: Int, list: List<PaymentRecord>) {
