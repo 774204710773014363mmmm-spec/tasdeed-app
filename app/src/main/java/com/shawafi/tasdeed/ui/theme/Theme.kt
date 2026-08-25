@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.shawafi.tasdeed.R
 
-// هوية سماوية (Sky Blue) - الألوان الخارجية للتطبيق
+// هوية كهربائية حديثة (Electric Blue)
 val Green = Color(0xFF0284C7)
 val GreenDark = Color(0xFF0369A1)
 val GreenLight = Color(0xFF38BDF8)
@@ -28,9 +28,11 @@ val Red = Color(0xFFDC2626)
 val Gray = Color(0xFF98A2B3)
 val Green2 = Color(0xFF22C55E)
 
-// التدرج السماوي - هوية التطبيق
+// تدرج كهربائي حديث — هوية التطبيق
 val GreenBrush = Brush.linearGradient(listOf(Color(0xFF38BDF8), Color(0xFF0284C7), Color(0xFF0369A1)))
 val GreenSoftBrush = Brush.linearGradient(listOf(Color(0xFFE0F2FE), Color(0xFFBAE6FD)))
+val ElectricBrush = Brush.horizontalGradient(listOf(Color(0xFF0EA5E9), Color(0xFF0284C7), Color(0xFF0369A1)))
+val ElectricCardBrush = Brush.horizontalGradient(listOf(Color(0xFFE0F2FE), Color(0xFFBAE6FD), Color(0xFFE0F2FE)))
 
 // خط عربي حديث
 val Tajawal = FontFamily(
