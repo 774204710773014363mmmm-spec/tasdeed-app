@@ -130,22 +130,17 @@ fun ManageSubCard(
             onLongClick = onLongPress
         ),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            // هيدر متدرج بidakarta الاسم والعداد
+            // هيدر متدرج: الاسم والعداد والمبالغ
             Row(
                 Modifier.fillMaxWidth().background(ElectricCardBrush).padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(Brush.linearGradient(listOf(GreenLight, Green))),
+                    Modifier.size(42.dp).clip(CircleShape).background(Brush.linearGradient(listOf(GreenLight, Green))),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(sub.name.take(2).ifEmpty { "?" }, color = Color.White, fontWeight = FontWeight.Bold)
@@ -164,41 +159,28 @@ fun ManageSubCard(
                         fontWeight = FontWeight.Medium
                     )
                     if (paidTotal > 0) {
-                        Text(
-                            "✅ مسدد ${formatNum(paidTotal)} د.ع",
-                            fontSize = 11.sp,
-                            color = Color(0xFF22C55E),
-                            fontWeight = FontWeight.Medium
-                        )
+                        Text("✅ مسدد ${formatNum(paidTotal)} د.ع", fontSize = 11.sp, color = Color(0xFF22C55E), fontWeight = FontWeight.Medium)
                     }
                 }
             }
-            // محتوى البطاقة
-            Column(Modifier.padding(12.dp)) {
-                Column(Modifier.weight(1f)) {
-                    Text("🙈 إخفاء عن الفروع", fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                    Text(
-                        if (sub.hidden) "مخفي — يظهر فقط لجهاز المطور" else "ظاهر لكل الفروع",
-                        fontSize = 11.sp,
-                        color = Color.Gray
-                    )
+            // محتوى البطاقة: مفاتيح الإخفاء + تلميح الحذف
+            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("🙈 إخفاء عن الفروع", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                        Text(if (sub.hidden) "مخفي — يظهر فقط لجهاز المطور" else "ظاهر لكل الفروع", fontSize = 11.sp, color = Color.Gray)
+                    }
+                    Switch(checked = sub.hidden, onCheckedChange = onToggleHidden)
                 }
-                Switch(checked = sub.hidden, onCheckedChange = onToggleHidden)
-            }
-            Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("🔒 إخفاء المبالغ", fontWeight = FontWeight.Medium, fontSize = 13.sp)
-                    Text(
-                        if (sub.hideAmounts) "المبالغ مخفية عن كل الفروع" else "المبالغ ظاهرة للجميع",
-                        fontSize = 11.sp,
-                        color = Color.Gray
-                    )
+                Spacer(Modifier.height(6.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("🔒 إخفاء المبالغ", fontWeight = FontWeight.Medium, fontSize = 13.sp)
+                        Text(if (sub.hideAmounts) "المبالغ مخفية عن كل الفروع" else "المبالغ ظاهرة للجميع", fontSize = 11.sp, color = Color.Gray)
+                    }
+                    Switch(checked = sub.hideAmounts, onCheckedChange = onToggleAmounts)
                 }
-                Switch(checked = sub.hideAmounts, onCheckedChange = onToggleAmounts)
-            }
-            // تلميح: اضغط مطولاً للحذف
-            Text("💡 اضغط مطولاً على الاسم لحذف المشترك", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
+                Text("💡 اضغط مطولاً على البطاقة لحذف المشترك", fontSize = 10.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
             }
         }
     }
