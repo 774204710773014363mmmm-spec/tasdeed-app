@@ -1,5 +1,6 @@
 package com.shawafi.tasdeed.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
@@ -37,6 +38,8 @@ fun ArchiveScreen(
     var renameTarget by remember { mutableStateOf<Int?>(null) }
     var infoTarget by remember { mutableStateOf<Int?>(null) }
     var deleteTarget by remember { mutableStateOf<Int?>(null) }
+    var mergeSel by remember { mutableStateOf<Int?>(null) }
+    var mergeTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     val periods by vm.periods.collectAsState()
     val periodSubCounts = remember(periods) { periods.map { ReportExporter.groupPayments(it.payments).size } }
 
@@ -58,10 +61,23 @@ fun ArchiveScreen(
             item { Text("📦 الكشوفات المغلقة", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
             items(periods, key = { it.name + it.createdAt }) { p ->
                 val pIdx = periods.indexOf(p)
-                Card(modifier = Modifier.fillMaxWidth().combinedClickable(
-                    onClick = { onOpenStatement(p.name, pIdx, "archive") },
-                    onLongClick = { menuTarget = pIdx }
-                )) {
+                val isMergeSel = mergeSel == pIdx
+                Card(
+                    modifier = Modifier.fillMaxWidth().combinedClickable(
+                        onClick = { onOpenStatement(p.name, pIdx, "archive") },
+                        onLongClick = {
+                            val sel = mergeSel
+                            if (sel != null && sel != pIdx) {
+                                mergeTarget = sel to pIdx
+                                mergeSel = null
+                            } else {
+                                mergeSel = pIdx
+                                menuTarget = pIdx
+                            }
+                        }
+                    ),
+                    border = if (isMergeSel) BorderStroke(2.dp, Green) else null
+                ) {
                     Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text("📁 ${p.name}", fontWeight = FontWeight.SemiBold)
@@ -104,6 +120,15 @@ fun ArchiveScreen(
                         modifier = Modifier.clickable { menuTarget = null; infoTarget = menuIdx }
                     )
                     ListItem(
+                        headlineContent = { Text("🔗 دمج مع كشف آخر") },
+                        supportingContent = { Text("اضغط مطولاً على الكشف الآخر بعد إغلاق هذه القائمة", fontSize = 11.5.sp) },
+                        modifier = Modifier.clickable {
+                            mergeSel = menuIdx
+                            vm.toast("🔗 اخترت «${p.name}» — اضغط مطولاً على الكشف الآخر لدمجه")
+                            menuTarget = null
+                        }
+                    )
+                    ListItem(
                         headlineContent = { Text("🗑 حذف الكشف", color = Color(0xFFDC2626)) },
                         modifier = Modifier.clickable { menuTarget = null; deleteTarget = menuIdx }
                     )
@@ -111,6 +136,22 @@ fun ArchiveScreen(
             }
         } else {
             menuTarget = null
+        }
+    }
+
+    // تأكيد دمج الكشفين
+    val mg = mergeTarget
+    if (mg != null) {
+        val a = periods.getOrNull(mg.first)
+        val b = periods.getOrNull(mg.second)
+        if (a != null && b != null) {
+            MergePeriodsDialog(
+                target = a.name,
+                source = b.name,
+                onConfirm = { vm.mergePeriods(fromIdx = mg.second, intoIdx = mg.first) }
+            ) { mergeTarget = null }
+        } else {
+            mergeTarget = null
         }
     }
 
@@ -149,8 +190,37 @@ fun ArchiveScreen(
 }
 
 @Composable
-fun RenamePeriodDialog(currentName: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var name by remember { mutableStateOf(currentName) }
+fun MergePeriodsDialog(target: String, source: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(20.dp)) {
+            Column(Modifier.padding(20.dp)) {
+                Text("🔗 دمج الكشفين", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "سيتم نقل كل دفعات «$source» إلى كشف «$target»\nثم حذف «$source» نهائياً.",
+                    fontSize = 13.5.sp,
+                    color = Color.Gray
+                )
+                Spacer(Modifier.height(18.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(onClick = onDismiss, shape = RoundedCornerShape(12.dp), modifier = Modifier.weight(1f).height(48.dp)) { Text("إلغاء") }
+                    Button(
+                        onClick = {
+                            onConfirm()
+                            onDismiss()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Green)
+                    ) { Text("🔗 دمج", fontWeight = FontWeight.Bold) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun RenamePeriodDialog(currentName: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {    var name by remember { mutableStateOf(currentName) }
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp)) {
             Column(Modifier.padding(20.dp)) {
