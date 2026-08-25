@@ -172,56 +172,6 @@ class AppRepository(val store: LocalStore) {
         return out
     }
 
-    /** إجمالي المسدد لكل مشترك من سحابة تطبيق الجوال نفسها (أرشيف كل الفروع: الحالي + الكشوفات المغلقة)
-     *  مع احترام علامة التصفير: الدفعات الأقدم من reset_at لا تُحتسب (بداية شهر جديد) */
-    fun fetchPaidTotals(): Map<String, Double> {
-        val resetAt = try {
-            FirebaseClient.get("${FirebaseClient.ROOT}/paid_totals_reset")?.optLong("reset_at", 0L) ?: getPaidTotalsResetAt()
-        } catch (e: Exception) { getPaidTotalsResetAt() }
-        val out = mutableMapOf<String, Double>()
-        for (br in branchesCache.keys.toList()) {
-            val o = try { FirebaseClient.get("${FirebaseClient.ROOT}/archive/$br") } catch (e: Exception) { null } ?: continue
-            val deleted = mutableSetOf<String>()
-            o.optJSONObject("deleted")?.let { dobj ->
-                dobj.optJSONArray("keys")?.let { arr -> for (i in 0 until arr.length()) deleted.add(arr.optString(i)) }
-            }
-            fun addRecord(rec: JSONObject) {
-                val amt = rec.optDouble("amount", 0.0)
-                if (amt <= 0.0) return
-                if (resetAt > 0 && rec.optLong("created_at", 0L) < resetAt) return
-                val name = rec.optString("subscriber_name", "").trim().lowercase()
-                if (name.isEmpty()) return
-                out[name] = (out[name] ?: 0.0) + amt
-            }
-            o.optJSONArray("current")?.let { arr ->
-                for (i in 0 until arr.length()) arr.optJSONObject(i)?.let { addRecord(it) }
-            }
-            o.optJSONArray("periods")?.let { arr ->
-                for (i in 0 until arr.length()) {
-                    val po = arr.optJSONObject(i) ?: continue
-                    val pk = po.optString("name") + "|" + po.optString("created_at")
-                    if (pk in deleted) continue
-                    po.optJSONArray("payments")?.let { pays ->
-                        for (j in 0 until pays.length()) pays.optJSONObject(j)?.let { addRecord(it) }
-                    }
-                }
-            }
-        }
-        return out
-    }
-
-    /** علامة تصفير المبالغ المسددة (بداية شهر جديد) — محلياً */
-    fun getPaidTotalsResetAt(): Long = store.getString("paid_totals_reset")?.toLongOrNull() ?: 0L
-
-    /** تصفير المبالغ المسددة: يكتب طابعاً زمنياً بالسحابة — الأرشيف والدفعات المحفوظة لا تُمس */
-    fun resetPaidTotals(): Boolean {
-        val now = System.currentTimeMillis()
-        val payload = JSONObject().put("reset_at", now)
-        val ok = try { FirebaseClient.put("${FirebaseClient.ROOT}/paid_totals_reset", payload) } catch (e: Exception) { false }
-        if (ok) store.putString("paid_totals_reset", now.toString())
-        return ok
-    }
-
     /** كل المشتركين بما فيهم المخفيين (لشاشة إدارة المشتركين) */
     fun getAllSubscribers(): List<Subscriber> = subscribersCache.values.toList()
 
