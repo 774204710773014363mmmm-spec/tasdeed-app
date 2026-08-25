@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircle
@@ -187,8 +188,7 @@ fun FreeScreen(
                 ) { Text("➕ فتح كشف حساباتي جديد", fontWeight = FontWeight.Bold) }
             }
             item { Text("💼 الكشوفات السابقة", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
-            items(myPeriods, key = { it.name + it.createdAt }) { p ->
-                val pIdx = myPeriods.indexOf(p)
+            itemsIndexed(myPeriods, key = { i, p -> "my_$i|" + p.name + "|" + p.createdAt }) { pIdx, p ->
                 Card(modifier = Modifier.fillMaxWidth().combinedClickable(
                     onClick = { onOpenStatement(p.name, pIdx, "my") },
                     onLongClick = { menuTarget = pIdx }
@@ -351,7 +351,12 @@ fun AddMyPaymentDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                         readOnly = true,
                         label = { Text("📁 الكشف") },
                         trailingIcon = { Text("▼", color = Color.Gray) },
-                        modifier = Modifier.fillMaxWidth().clickable { if (myPeriods.isNotEmpty()) periodMenu = true }
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    // طبقة شفافة فوق الحقل: حقل readOnly يلتهم اللمس فلا تُفتح القائمة بدونه
+                    Box(
+                        Modifier.matchParentSize()
+                            .clickable { if (myPeriods.isNotEmpty()) periodMenu = true }
                     )
                     DropdownMenu(
                         expanded = periodMenu,
