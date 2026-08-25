@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -59,8 +60,7 @@ fun ArchiveScreen(
                 item { Box(Modifier.fillMaxWidth().padding(vertical = 30.dp), contentAlignment = Alignment.Center) { Text("لا توجد كشوفات بعد — أنشئ كشفاً أولاً وستُسجَّل فيه كل الدفعات", color = Color.Gray) } }
             }
             item { Text("📦 الكشوفات المغلقة", fontWeight = FontWeight.Bold, fontSize = 15.sp) }
-            items(periods, key = { it.name + it.createdAt }) { p ->
-                val pIdx = periods.indexOf(p)
+            itemsIndexed(periods, key = { i, p -> "arc_$i|" + p.name + "|" + p.createdAt }) { pIdx, p ->
                 val isMergeSel = mergeSel == pIdx
                 Card(
                     modifier = Modifier.fillMaxWidth().combinedClickable(
