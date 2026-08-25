@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.shawafi.tasdeed.ui.AppViewModel
 import com.shawafi.tasdeed.ui.theme.Green
 import com.shawafi.tasdeed.ui.theme.GreenBrush
+import com.shawafi.tasdeed.ui.theme.ElectricBrush
 import com.shawafi.tasdeed.ui.theme.Amber
 
 data class NavItem(val id: String, val label: String, val icon: ImageVector, val iconOutline: ImageVector)
@@ -33,7 +34,7 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
     val devMode by vm.devMode.collectAsState()
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 8.dp
+        tonalElevation = 12.dp
     ) {
         val items = buildList {
             add(NavItem("home", "الفواتير", Icons.Filled.ReceiptLong, Icons.Outlined.ReceiptLong))
@@ -66,9 +67,9 @@ fun BottomNavBar(vm: AppViewModel, current: String, onNav: (String) -> Unit) {
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = Green,
                     selectedTextColor = Green,
-                    indicatorColor = Green.copy(alpha = 0.16f),
-                    unselectedIconColor = Color.Gray,
-                    unselectedTextColor = Color.Gray
+                    indicatorColor = Green.copy(alpha = 0.12f),
+                    unselectedIconColor = Color(0xFF94A3B8),
+                    unselectedTextColor = Color(0xFF94A3B8)
                 )
             )
         }
@@ -100,7 +101,7 @@ fun OnlinePill(online: Boolean) {
 fun TopBar(vm: AppViewModel, title: String, onRefresh: (() -> Unit)? = null, onSettings: (() -> Unit)? = null) {
     val online by vm.isOnline.collectAsState()
     TopAppBar(
-        modifier = Modifier.background(GreenBrush),
+        modifier = Modifier.background(ElectricBrush),
         title = {
             Column {
                 Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
