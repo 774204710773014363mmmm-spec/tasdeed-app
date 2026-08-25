@@ -332,12 +332,47 @@ fun FreeScreen(
 fun AddMyPaymentDialog(vm: AppViewModel, onDismiss: () -> Unit) {
     var amount by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    val myPeriods by vm.myPeriods.collectAsState()
+    var periodIdx by remember { mutableStateOf(if (myPeriods.isEmpty()) -1 else myPeriods.lastIndex) }
+    var periodMenu by remember { mutableStateOf(false) }
+    val selectedName = if (periodIdx in myPeriods.indices) myPeriods[periodIdx].name else "لا يوجد كشف"
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(20.dp)) {
             Column(Modifier.padding(20.dp)) {
                 Text("💼 تسجيل دفعة - حساباتي", fontWeight = FontWeight.Bold, fontSize = 17.sp)
                 Spacer(Modifier.height(14.dp))
+                // اختيار الكشف الذي ستُسجَّل فيه الدفعة
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = selectedName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("📁 الكشف") },
+                        trailingIcon = { Text("▼", color = Color.Gray) },
+                        modifier = Modifier.fillMaxWidth().clickable { if (myPeriods.isNotEmpty()) periodMenu = true }
+                    )
+                    DropdownMenu(
+                        expanded = periodMenu,
+                        onDismissRequest = { periodMenu = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        myPeriods.forEachIndexed { i, p ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        if (i == myPeriods.lastIndex) "📁 ${p.name}  (الأحدث)"
+                                        else "📁 ${p.name}",
+                                        fontWeight = if (i == periodIdx) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                trailingIcon = { if (i == periodIdx) Text("✓", color = Green, fontWeight = FontWeight.Bold) },
+                                onClick = { periodIdx = i; periodMenu = false }
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it },
@@ -360,7 +395,7 @@ fun AddMyPaymentDialog(vm: AppViewModel, onDismiss: () -> Unit) {
                         onClick = {
                             val amt = amount.toDoubleOrNull() ?: 0.0
                             if (amt <= 0) { vm.toast("أدخل مبلغ صحيح", true); return@Button }
-                            vm.addMyAccountPayment(amt, note.trim())
+                            vm.addMyAccountPayment(amt, note.trim(), periodIdx)
                             onDismiss()
                         },
                         modifier = Modifier.weight(1f).height(48.dp),
